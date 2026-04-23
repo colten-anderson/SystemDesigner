@@ -12,12 +12,48 @@ Use it to:
 - hand high-quality context to AI agents,
 - capture architecture decisions and known risks in one place.
 
-## What you get
-- A **mode-aware interview protocol** to extract context consistently.
-- A **fixed 10-file portfolio structure** so every system is documented the same way.
-- **Practical templates** with prompts that drive specific, actionable content.
-- **Reference examples** for enterprise SaaS systems.
-- **Wiring guides** for feeding the resulting docs into prompts, MCP resources, and integration layers.
+## Complete functionality overview
+This repository includes end-to-end capabilities for **creating**, **filling**, **validating**, **reviewing**, and **operationalizing** system portfolios:
+
+1. **Standardized portfolio model**
+   - Fixed 10-file schema with shared naming for every system mode.
+   - Mode-aware interviewing so depth and emphasis adapt by system type.
+
+2. **Template-driven authoring**
+   - Ready-to-copy markdown templates with expected output fields.
+   - Placeholder patterns intentionally detectable by the validator.
+
+3. **Guided elicitation workflow**
+   - A dedicated interviewer prompt (`interview-protocol/agent-system-prompt.md`) to run structured discovery sessions.
+
+4. **Portfolio scaffolding CLI** (`scripts/create_portfolio.py`)
+   - Creates a new portfolio directory from templates.
+   - Supports dry-run previews and force-overwrite behavior.
+   - Supports custom template directories.
+
+5. **Portfolio validation CLI** (`scripts/validate_portfolio.py`)
+   - Checks required file presence.
+   - Detects placeholder text.
+   - Scores content quality (0-100) using section coverage, field completion, and content length.
+   - Supports strict placeholder enforcement.
+   - Supports parent-folder batch validation.
+   - Supports filtering to only likely portfolios during batch mode.
+   - Supports JSON output for machine-readable CI automation.
+   - Supports minimum quality gates.
+   - Supports markdown report generation.
+   - Supports freshness checks from ISO dates and stale-fact thresholds.
+   - Supports warning-to-failure mode for stricter CI policies.
+
+6. **Integration/wiring patterns**
+   - Patterns for OpenClaw agents, API-layer usage, MCP resources, Claude Projects, and system prompt composition.
+
+7. **Reference implementations**
+   - Complete sample portfolios for Exchange Online, OneDrive, NinjaOne RMM, Customer Billing API, and Snowflake Analytics Platform.
+
+8. **Quality and UX aids**
+   - `GETTING-STARTED.md` for first-pass onboarding.
+   - `UX-CHECKLIST.md` for practical documentation quality and operator usability.
+   - Automated tests for scaffold and validation scripts (`tests/`).
 
 ## Supported system modes
 The interview starts with a required mode picker:
@@ -47,6 +83,7 @@ Mode changes emphasis, not file names.
 - `examples/` — sample portfolios (Exchange Online, OneDrive, NinjaOne RMM, Customer Billing API, Snowflake Analytics Platform).
 - `wiring/` — implementation patterns for consuming context in tools and workflows.
 - `scripts/` — helper utilities such as portfolio scaffolding and structure validation.
+- `tests/` — script-level tests for scaffold and validation behavior.
 
 ## Quick start (5 minutes)
 1. Pick a system and create a folder for it.
@@ -57,13 +94,66 @@ Mode changes emphasis, not file names.
 
 For full onboarding, see [GETTING-STARTED.md](GETTING-STARTED.md).
 
+## CLI usage
+
+### 1) Create portfolio scaffold
+```bash
+# Create a new portfolio from repository templates
+python scripts/create_portfolio.py ./my-system
+
+# Preview scaffold operations without writing files
+python scripts/create_portfolio.py ./my-system --dry-run
+
+# Overwrite existing files in destination
+python scripts/create_portfolio.py ./my-system --force
+
+# Use a custom template source
+python scripts/create_portfolio.py ./my-system --templates-dir ./templates
+```
+
+### 2) Validate portfolio quality and completeness
+```bash
+# Basic validation for one portfolio
+python scripts/validate_portfolio.py my-system
+
+# Fail if placeholder content is present
+python scripts/validate_portfolio.py my-system --strict
+
+# Validate all immediate subfolders under a parent directory
+python scripts/validate_portfolio.py examples --all
+
+# In mixed parent directories, only evaluate folders that look like portfolios
+python scripts/validate_portfolio.py . --all --only-portfolios
+
+# Emit JSON for CI and machine processing
+python scripts/validate_portfolio.py examples --all --json
+
+# Enforce minimum quality score
+python scripts/validate_portfolio.py examples --all --quality-gate 80
+
+# Write markdown review report
+python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
+
+# Flag stale documentation based on most recent ISO dates in each file
+python scripts/validate_portfolio.py examples --all --max-fact-age-days 90
+
+# Fail build when freshness checks fail
+python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --enforce-freshness
+
+# Fail build on any warning (placeholder and/or freshness)
+python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --fail-on-warnings
+```
+
+## Exit code behavior (for CI)
+`validate_portfolio.py` returns:
+- `0` = pass (or pass with warnings when warnings are not configured to fail)
+- `1` = policy failure (missing files, strict placeholders, freshness enforcement, warning enforcement, or quality gate failure)
+- `2` = invocation/validation error (invalid args or unreadable target directory)
+
 ## Example workflow
 ```bash
 # 1) Scaffold a new portfolio from templates
 python scripts/create_portfolio.py ./my-system
-
-# Preview scaffold actions without writing files
-python scripts/create_portfolio.py ./my-system --dry-run
 
 # 2) Start from a reference example (optional)
 cp -R examples/exchange-online ./my-system
@@ -71,32 +161,11 @@ cp -R examples/exchange-online ./my-system
 # 3) Adapt content to your real system
 $EDITOR my-system/*.md
 
-# 4) Validate required files
-python scripts/validate_portfolio.py my-system
+# 4) Validate required files and quality
+python scripts/validate_portfolio.py my-system --quality-gate 80
 
-# 5) Optional strict mode (flags placeholders)
-python scripts/validate_portfolio.py my-system --strict
-
-# 6) Validate every portfolio in a parent directory
-python scripts/validate_portfolio.py examples --all
-
-# 6b) In mixed directories, validate only folders that look like portfolios
-python scripts/validate_portfolio.py . --all --only-portfolios
-
-# 7) Export machine-readable results
-python scripts/validate_portfolio.py examples --all --json
-
-# 8) Enforce a minimum quality score in CI
-python scripts/validate_portfolio.py examples --all --quality-gate 80
-
-# 9) Generate a markdown report for reviews
-python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
-
-# 10) Keep facts fresh in CI (fail if latest dated fact is too old)
-python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --enforce-freshness
-
-# 11) Treat all warnings as CI failures (placeholders + freshness gaps)
-python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --fail-on-warnings
+# 5) Optional strict CI-like checks
+python scripts/validate_portfolio.py my-system --strict --max-fact-age-days 90 --fail-on-warnings
 ```
 
 ## Better example patterns (copy/paste starters)
@@ -126,20 +195,6 @@ Use these when replacing template placeholders so your portfolio becomes immedia
 - **Operational effect:** Bulk migration windows are capped and must be staged.
 - **Current mitigation:** Batch size limits + off-peak scheduling.
 - **Follow-up owner/date:** Messaging Platform Team — review quarterly.
-
-## Validation helper
-Run the validator script against any portfolio folder to confirm required files, flag placeholders, and score documentation quality:
-
-```bash
-python scripts/create_portfolio.py ./my-system
-python scripts/validate_portfolio.py examples/exchange-online
-python scripts/validate_portfolio.py examples/exchange-online --strict
-python scripts/validate_portfolio.py examples --all --json
-python scripts/validate_portfolio.py examples --all --quality-gate 80
-python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
-python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --enforce-freshness
-python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --fail-on-warnings
-```
 
 ## Core principles
 - **One system per portfolio**.
