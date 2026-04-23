@@ -50,6 +50,9 @@ Then verify content quality:
 ## 5) Integrate into workflows
 Use guides in `wiring/` to consume the portfolio in MCP resources, service catalogs, AI system prompts, context packs, and operations workflows.
 
+## 6) Improve user experience as you scale
+Use [UX-CHECKLIST.md](UX-CHECKLIST.md) to reduce onboarding friction and improve incident usability as more teams adopt the portfolio pattern.
+
 ## Quick quality examples (what "good" looks like)
 Use the patterns below to increase signal quality while filling templates:
 

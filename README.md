@@ -114,3 +114,28 @@ python scripts/validate_portfolio.py examples/exchange-online --strict
 - **Practical operations detail over generic narrative**.
 - **Explicit unknowns with follow-up owners**.
 - **Consistent file set across system modes**.
+
+## User experience improvements (practical defaults)
+If you want a smoother experience for both first-time contributors and daily operators, start here:
+
+1. **Reduce blank-page anxiety**
+   - Pre-fill templates with one realistic sample row or bullet per section.
+   - Add "minimum acceptable content" guidance directly below each heading.
+
+2. **Optimize for time-to-first-value (15 minutes)**
+   - Prioritize identity, ownership, escalation, and incident-first operations content before deep architecture details.
+   - Use strict validation only after the first complete pass to avoid early friction.
+
+3. **Design for incident usage, not documentation beauty**
+   - Keep "first 10 minutes" checks visible and scannable.
+   - Prefer concise tables for dependencies and impact over long prose.
+
+4. **Create visible progress and confidence**
+   - Track completion state per file (draft / reviewed / production-ready).
+   - Record unknowns with owner and follow-up date so users know what is intentionally incomplete.
+
+5. **Shorten onboarding loops**
+   - Start each new system from the closest example in `examples/`.
+   - Add a quick peer review checklist (owner clarity, runbook usability, dependency impact, risk explicitness).
+
+For a ready-to-run checklist, see [UX-CHECKLIST.md](UX-CHECKLIST.md).
