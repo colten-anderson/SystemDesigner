@@ -46,3 +46,12 @@ Mode changes emphasis, not file names.
 
 ## Quick start
 See [GETTING-STARTED.md](GETTING-STARTED.md).
+
+## Validation helper
+Run the validator script against any portfolio folder to quickly confirm required files and optionally flag placeholders:
+
+```bash
+python scripts/validate_portfolio.py examples/exchange-online
+python scripts/validate_portfolio.py examples/exchange-online --strict
+```
+
