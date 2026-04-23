@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Scaffold a new SystemDesigner portfolio from templates."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import shutil
+import sys
+
+DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Create a new portfolio directory by copying template files."
+    )
+    parser.add_argument(
+        "destination",
+        type=Path,
+        help="Path to create for the new portfolio (for example: ./my-system)",
+    )
+    parser.add_argument(
+        "--templates-dir",
+        type=Path,
+        default=DEFAULT_TEMPLATES_DIR,
+        help="Directory containing template markdown files (defaults to repository templates/).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing files in the destination directory.",
+    )
+    return parser.parse_args()
+
+
+def list_template_files(templates_dir: Path) -> list[Path]:
+    if not templates_dir.exists() or not templates_dir.is_dir():
+        raise ValueError(f"Template directory not found: {templates_dir}")
+
+    template_files = sorted(path for path in templates_dir.glob("*.md") if path.is_file())
+    if not template_files:
+        raise ValueError(f"No markdown template files found in: {templates_dir}")
+
+    return template_files
+
+
+def create_portfolio(destination: Path, templates_dir: Path, force: bool) -> tuple[int, int]:
+    template_files = list_template_files(templates_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    copied_count = 0
+    skipped_count = 0
+
+    for source in template_files:
+        target = destination / source.name
+
+        if target.exists() and not force:
+            skipped_count += 1
+            print(f"SKIP: {target} already exists (use --force to overwrite)")
+            continue
+
+        shutil.copy2(source, target)
+        copied_count += 1
+        print(f"COPY: {source.name} -> {target}")
+
+    return copied_count, skipped_count
+
+
+def main() -> int:
+    args = parse_args()
+
+    try:
+        copied_count, skipped_count = create_portfolio(
+            destination=args.destination,
+            templates_dir=args.templates_dir,
+            force=args.force,
+        )
+    except ValueError as error:
+        print(f"ERROR: {error}")
+        return 2
+
+    print(
+        f"\nDone. Copied {copied_count} file(s)"
+        + (f", skipped {skipped_count} existing file(s)." if skipped_count else ".")
+    )
+
+    if copied_count == 0:
+        print("No files were copied.")
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
