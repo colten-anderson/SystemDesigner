@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import sys
 
@@ -43,21 +44,34 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fail when placeholder text is detected.",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help=(
+            "Treat portfolio_path as a parent directory and validate all immediate "
+            "subdirectories as portfolios."
+        ),
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON output.",
+    )
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    portfolio_path = args.portfolio_path
-
+def validate_one_portfolio(portfolio_path: Path) -> dict[str, object]:
     if not portfolio_path.exists() or not portfolio_path.is_dir():
-        print(f"ERROR: '{portfolio_path}' is not a directory.")
-        return 2
-
-    print(f"Validating portfolio: {portfolio_path}")
+        return {
+            "path": str(portfolio_path),
+            "error": f"'{portfolio_path}' is not a directory.",
+            "missing_files": [],
+            "placeholder_hits": [],
+            "status": "error",
+        }
 
     missing_files: list[str] = []
-    placeholder_hits: list[tuple[str, str]] = []
+    placeholder_hits: list[dict[str, str]] = []
 
     for name in REQUIRED_FILES:
         target = portfolio_path / name
@@ -69,8 +83,39 @@ def main() -> int:
         lowered = text.lower()
         for pattern in PLACEHOLDER_PATTERNS:
             if pattern.lower() in lowered:
-                placeholder_hits.append((name, pattern))
+                placeholder_hits.append({"file": name, "pattern": pattern})
                 break
+
+    status = "pass"
+    if missing_files:
+        status = "fail"
+    elif placeholder_hits:
+        status = "warning"
+
+    return {
+        "path": str(portfolio_path),
+        "missing_files": missing_files,
+        "placeholder_hits": placeholder_hits,
+        "status": status,
+    }
+
+
+def collect_portfolios(base_path: Path, validate_all: bool) -> list[Path]:
+    if not validate_all:
+        return [base_path]
+
+    return sorted(path for path in base_path.iterdir() if path.is_dir())
+
+
+def print_human_report(result: dict[str, object]) -> None:
+    print(f"Validating portfolio: {result['path']}")
+
+    if result.get("error"):
+        print(f"ERROR: {result['error']}\n")
+        return
+
+    missing_files = result["missing_files"]
+    placeholder_hits = result["placeholder_hits"]
 
     if missing_files:
         print("\nMissing required files:")
@@ -79,22 +124,70 @@ def main() -> int:
 
     if placeholder_hits:
         print("\nPotential placeholder content detected:")
-        for file_name, pattern in placeholder_hits:
-            print(f"- {file_name} (matched: {pattern})")
+        for hit in placeholder_hits:
+            print(f"- {hit['file']} (matched: {hit['pattern']})")
 
-    if missing_files:
-        print("\nFAIL: Portfolio is missing required files.")
+    print("")
+
+
+def determine_exit_code(results: list[dict[str, object]], strict: bool) -> int:
+    has_errors = any(result["status"] == "error" for result in results)
+    has_missing = any(result["missing_files"] for result in results)
+    has_placeholders = any(result["placeholder_hits"] for result in results)
+
+    if has_errors:
+        return 2
+    if has_missing:
         return 1
-
-    if placeholder_hits and args.strict:
-        print("\nFAIL: Placeholder content found while --strict mode is enabled.")
+    if strict and has_placeholders:
         return 1
+    return 0
 
-    if placeholder_hits:
-        print("\nPASS with warnings: Required files are present, but placeholders were detected.")
+
+def main() -> int:
+    args = parse_args()
+    portfolio_paths = collect_portfolios(args.portfolio_path, args.all)
+    results = [validate_one_portfolio(path) for path in portfolio_paths]
+
+    exit_code = determine_exit_code(results, args.strict)
+
+    if args.json:
+        payload = {
+            "strict": args.strict,
+            "all": args.all,
+            "results": results,
+            "summary": {
+                "total": len(results),
+                "errors": sum(1 for result in results if result["status"] == "error"),
+                "failed": sum(1 for result in results if result["missing_files"]),
+                "warnings": sum(1 for result in results if result["placeholder_hits"]),
+                "passed": sum(
+                    1
+                    for result in results
+                    if not result["missing_files"] and not result["placeholder_hits"]
+                ),
+            },
+        }
+        print(json.dumps(payload, indent=2))
+        return exit_code
+
+    for result in results:
+        print_human_report(result)
+
+    if exit_code == 2:
+        print("FAIL: One or more target directories could not be read as portfolios.")
+        return exit_code
+    if exit_code == 1 and any(result["missing_files"] for result in results):
+        print("FAIL: One or more portfolios are missing required files.")
+        return exit_code
+    if exit_code == 1 and args.strict:
+        print("FAIL: Placeholder content found while --strict mode is enabled.")
+        return exit_code
+    if any(result["placeholder_hits"] for result in results):
+        print("PASS with warnings: Required files are present, but placeholders were detected.")
         return 0
 
-    print("\nPASS: Portfolio contains all required files and no obvious placeholders.")
+    print("PASS: Portfolio contains all required files and no obvious placeholders.")
     return 0
 
 
