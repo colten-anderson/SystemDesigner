@@ -85,6 +85,9 @@ python scripts/validate_portfolio.py examples --all --quality-gate 80
 
 # 9) Generate a markdown report for reviews
 python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
+
+# 10) Keep facts fresh in CI (fail if latest dated fact is too old)
+python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --enforce-freshness
 ```
 
 ## Better example patterns (copy/paste starters)
@@ -125,6 +128,7 @@ python scripts/validate_portfolio.py examples/exchange-online --strict
 python scripts/validate_portfolio.py examples --all --json
 python scripts/validate_portfolio.py examples --all --quality-gate 80
 python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
+python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --enforce-freshness
 ```
 
 ## Core principles
