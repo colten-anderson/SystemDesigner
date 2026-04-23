@@ -62,6 +62,9 @@ For full onboarding, see [GETTING-STARTED.md](GETTING-STARTED.md).
 # 1) Scaffold a new portfolio from templates
 python scripts/create_portfolio.py ./my-system
 
+# Preview scaffold actions without writing files
+python scripts/create_portfolio.py ./my-system --dry-run
+
 # 2) Start from a reference example (optional)
 cp -R examples/exchange-online ./my-system
 

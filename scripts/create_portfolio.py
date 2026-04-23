@@ -31,6 +31,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Overwrite existing files in the destination directory.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be copied or skipped without writing files.",
+    )
     return parser.parse_args()
 
 
@@ -45,9 +50,15 @@ def list_template_files(templates_dir: Path) -> list[Path]:
     return template_files
 
 
-def create_portfolio(destination: Path, templates_dir: Path, force: bool) -> tuple[int, int]:
+def create_portfolio(
+    destination: Path,
+    templates_dir: Path,
+    force: bool,
+    dry_run: bool,
+) -> tuple[int, int]:
     template_files = list_template_files(templates_dir)
-    destination.mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        destination.mkdir(parents=True, exist_ok=True)
 
     copied_count = 0
     skipped_count = 0
@@ -57,12 +68,16 @@ def create_portfolio(destination: Path, templates_dir: Path, force: bool) -> tup
 
         if target.exists() and not force:
             skipped_count += 1
-            print(f"SKIP: {target} already exists (use --force to overwrite)")
+            prefix = "WOULD SKIP" if dry_run else "SKIP"
+            print(f"{prefix}: {target} already exists (use --force to overwrite)")
             continue
 
-        shutil.copy2(source, target)
+        if dry_run:
+            print(f"WOULD COPY: {source.name} -> {target}")
+        else:
+            shutil.copy2(source, target)
+            print(f"COPY: {source.name} -> {target}")
         copied_count += 1
-        print(f"COPY: {source.name} -> {target}")
 
     return copied_count, skipped_count
 
@@ -75,17 +90,18 @@ def main() -> int:
             destination=args.destination,
             templates_dir=args.templates_dir,
             force=args.force,
+            dry_run=args.dry_run,
         )
     except ValueError as error:
         print(f"ERROR: {error}")
         return 2
 
     print(
-        f"\nDone. Copied {copied_count} file(s)"
+        f"\nDone. {'Would copy' if args.dry_run else 'Copied'} {copied_count} file(s)"
         + (f", skipped {skipped_count} existing file(s)." if skipped_count else ".")
     )
 
-    if copied_count == 0:
+    if copied_count == 0 and not args.dry_run:
         print("No files were copied.")
         return 1
 
