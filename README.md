@@ -44,7 +44,7 @@ Mode changes emphasis, not file names.
 ## Repository layout
 - `interview-protocol/` — central interviewer system prompt.
 - `templates/` — baseline markdown templates for each portfolio file.
-- `examples/` — sample portfolios (Exchange Online, OneDrive, NinjaOne RMM).
+- `examples/` — sample portfolios (Exchange Online, OneDrive, NinjaOne RMM, Customer Billing API, Snowflake Analytics Platform).
 - `wiring/` — implementation patterns for consuming context in tools and workflows.
 - `scripts/` — helper utilities such as structure validation.
 
