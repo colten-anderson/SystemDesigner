@@ -47,6 +47,18 @@ Use strict mode to fail if placeholder text remains:
 python scripts/validate_portfolio.py portfolios/<system-name> --strict
 ```
 
+Validate multiple portfolios at once by pointing to a parent folder and adding `--all`:
+
+```bash
+python scripts/validate_portfolio.py portfolios --all
+```
+
+If you need to integrate validation into CI pipelines, add `--json` for machine-readable output:
+
+```bash
+python scripts/validate_portfolio.py portfolios --all --json
+```
+
 Then verify content quality:
 - a new engineer can identify owner, criticality, and architecture quickly;
 - on-call can execute first-response steps from docs;

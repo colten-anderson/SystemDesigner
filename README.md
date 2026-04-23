@@ -73,6 +73,12 @@ python scripts/validate_portfolio.py my-system
 
 # 5) Optional strict mode (flags placeholders)
 python scripts/validate_portfolio.py my-system --strict
+
+# 6) Validate every portfolio in a parent directory
+python scripts/validate_portfolio.py examples --all
+
+# 7) Export machine-readable results
+python scripts/validate_portfolio.py examples --all --json
 ```
 
 ## Better example patterns (copy/paste starters)
@@ -110,6 +116,7 @@ Run the validator script against any portfolio folder to confirm required files 
 python scripts/create_portfolio.py ./my-system
 python scripts/validate_portfolio.py examples/exchange-online
 python scripts/validate_portfolio.py examples/exchange-online --strict
+python scripts/validate_portfolio.py examples --all --json
 ```
 
 ## Core principles
