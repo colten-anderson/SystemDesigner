@@ -29,7 +29,19 @@ Required files:
 - `decisions-and-history.md`
 
 ## 4) Validate portfolio quality
-Before calling the portfolio complete, verify:
+Before calling the portfolio complete, run a structural check:
+
+```bash
+python scripts/validate_portfolio.py portfolios/<system-name>
+```
+
+Use strict mode to fail if placeholder text remains:
+
+```bash
+python scripts/validate_portfolio.py portfolios/<system-name> --strict
+```
+
+Then verify content quality:
 - a new engineer can identify owner, criticality, and architecture quickly;
 - on-call can execute first-response steps from docs;
 - key dependencies and risk constraints are explicit;
