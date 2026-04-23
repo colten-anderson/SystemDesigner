@@ -79,6 +79,12 @@ python scripts/validate_portfolio.py examples --all
 
 # 7) Export machine-readable results
 python scripts/validate_portfolio.py examples --all --json
+
+# 8) Enforce a minimum quality score in CI
+python scripts/validate_portfolio.py examples --all --quality-gate 80
+
+# 9) Generate a markdown report for reviews
+python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
 ```
 
 ## Better example patterns (copy/paste starters)
@@ -110,13 +116,15 @@ Use these when replacing template placeholders so your portfolio becomes immedia
 - **Follow-up owner/date:** Messaging Platform Team — review quarterly.
 
 ## Validation helper
-Run the validator script against any portfolio folder to confirm required files and optionally flag placeholders:
+Run the validator script against any portfolio folder to confirm required files, flag placeholders, and score documentation quality:
 
 ```bash
 python scripts/create_portfolio.py ./my-system
 python scripts/validate_portfolio.py examples/exchange-online
 python scripts/validate_portfolio.py examples/exchange-online --strict
 python scripts/validate_portfolio.py examples --all --json
+python scripts/validate_portfolio.py examples --all --quality-gate 80
+python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
 ```
 
 ## Core principles
