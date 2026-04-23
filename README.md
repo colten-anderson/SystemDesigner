@@ -46,11 +46,11 @@ Mode changes emphasis, not file names.
 - `templates/` — baseline markdown templates for each portfolio file.
 - `examples/` — sample portfolios (Exchange Online, OneDrive, NinjaOne RMM, Customer Billing API, Snowflake Analytics Platform).
 - `wiring/` — implementation patterns for consuming context in tools and workflows.
-- `scripts/` — helper utilities such as structure validation.
+- `scripts/` — helper utilities such as portfolio scaffolding and structure validation.
 
 ## Quick start (5 minutes)
 1. Pick a system and create a folder for it.
-2. Copy all files from `templates/` into that folder.
+2. Scaffold all template files into that folder.
 3. Run the interview in `interview-protocol/agent-system-prompt.md` and fill each file.
 4. Validate your folder structure and placeholders.
 5. Use the wiring docs to connect the portfolio into your AI/dev workflows.
@@ -59,16 +59,19 @@ For full onboarding, see [GETTING-STARTED.md](GETTING-STARTED.md).
 
 ## Example workflow
 ```bash
-# 1) Start from a reference example
+# 1) Scaffold a new portfolio from templates
+python scripts/create_portfolio.py ./my-system
+
+# 2) Start from a reference example (optional)
 cp -R examples/exchange-online ./my-system
 
-# 2) Adapt content to your real system
+# 3) Adapt content to your real system
 $EDITOR my-system/*.md
 
-# 3) Validate required files
+# 4) Validate required files
 python scripts/validate_portfolio.py my-system
 
-# 4) Optional strict mode (flags placeholders)
+# 5) Optional strict mode (flags placeholders)
 python scripts/validate_portfolio.py my-system --strict
 ```
 
@@ -104,6 +107,7 @@ Use these when replacing template placeholders so your portfolio becomes immedia
 Run the validator script against any portfolio folder to confirm required files and optionally flag placeholders:
 
 ```bash
+python scripts/create_portfolio.py ./my-system
 python scripts/validate_portfolio.py examples/exchange-online
 python scripts/validate_portfolio.py examples/exchange-online --strict
 ```

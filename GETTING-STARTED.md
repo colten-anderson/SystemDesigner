@@ -14,7 +14,13 @@ The interviewer must begin with the mode picker:
 - Other / mixed
 
 ## 3) Populate the 10 baseline files
-Copy all files from `templates/` into your system folder and fill them through interview + validation.
+Scaffold template files into your system folder, then fill them through interview + validation.
+
+```bash
+python scripts/create_portfolio.py portfolios/<system-name>
+```
+
+If you rerun this command, existing files are preserved by default. Use `--force` to overwrite files.
 
 Required files:
 - `system-identity.md`
