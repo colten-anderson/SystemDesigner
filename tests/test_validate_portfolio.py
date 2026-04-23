@@ -46,6 +46,43 @@ def test_enforce_freshness_requires_max_fact_age() -> None:
     assert "--enforce-freshness requires --max-fact-age-days" in result.stdout
 
 
+def test_only_portfolios_requires_all() -> None:
+    result = run_validate("examples", "--only-portfolios")
+    assert result.returncode == 2
+    assert "--only-portfolios requires --all" in result.stdout
+
+
+def test_only_portfolios_filters_unrelated_directories(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "notes").mkdir()
+
+    portfolio = root / "portfolio-a"
+    portfolio.mkdir()
+    required_files = [
+        "system-identity.md",
+        "business-context.md",
+        "architecture.md",
+        "tech-stack.md",
+        "dependencies-and-integrations.md",
+        "data.md",
+        "security-and-access.md",
+        "operations.md",
+        "known-issues-and-constraints.md",
+        "decisions-and-history.md",
+    ]
+    for file_name in required_files:
+        (portfolio / file_name).write_text(
+            "## Summary\n## Output Structure\n## For AI + Human Use\n## Open Questions / TBDs\n",
+            encoding="utf-8",
+        )
+
+    result = run_validate(str(root), "--all", "--only-portfolios")
+    assert result.returncode == 0
+    assert f"Validating portfolio: {portfolio}" in result.stdout
+    assert f"Validating portfolio: {root / 'notes'}" not in result.stdout
+
+
 def test_freshness_gate_detects_stale_or_undated_content(tmp_path: Path) -> None:
     portfolio = tmp_path / "portfolio"
     portfolio.mkdir()

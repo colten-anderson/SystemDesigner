@@ -72,6 +72,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--only-portfolios",
+        action="store_true",
+        help=(
+            "When used with --all, validate only subdirectories that contain one or more "
+            "required portfolio files."
+        ),
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON output.",
@@ -371,11 +379,22 @@ def validate_one_portfolio(
     }
 
 
-def collect_portfolios(base_path: Path, validate_all: bool) -> list[Path]:
+def is_likely_portfolio_directory(path: Path) -> bool:
+    return any((path / required_file).exists() for required_file in REQUIRED_FILES)
+
+
+def collect_portfolios(
+    base_path: Path,
+    validate_all: bool,
+    only_portfolios: bool = False,
+) -> list[Path]:
     if not validate_all:
         return [base_path]
 
-    return sorted(path for path in base_path.iterdir() if path.is_dir())
+    directories = sorted(path for path in base_path.iterdir() if path.is_dir())
+    if only_portfolios:
+        return [path for path in directories if is_likely_portfolio_directory(path)]
+    return directories
 
 
 def print_human_report(result: dict[str, object]) -> None:
@@ -512,11 +531,18 @@ def main() -> int:
     if args.enforce_freshness and args.max_fact_age_days is None:
         print("ERROR: --enforce-freshness requires --max-fact-age-days.")
         return 2
+    if args.only_portfolios and not args.all:
+        print("ERROR: --only-portfolios requires --all.")
+        return 2
 
     templates_dir = Path(__file__).resolve().parents[1] / "templates"
     expected_fields_by_file = load_expected_fields(templates_dir)
 
-    portfolio_paths = collect_portfolios(args.portfolio_path, args.all)
+    portfolio_paths = collect_portfolios(
+        args.portfolio_path,
+        args.all,
+        args.only_portfolios,
+    )
     results = [
         validate_one_portfolio(
             path,
