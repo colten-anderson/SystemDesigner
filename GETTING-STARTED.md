@@ -71,6 +71,12 @@ And generate a markdown review artifact for audits or PRs:
 python scripts/validate_portfolio.py portfolios --all --report reports/portfolio-validation.md
 ```
 
+If your CI policy treats warnings as failures, use:
+
+```bash
+python scripts/validate_portfolio.py portfolios --all --max-fact-age-days 90 --fail-on-warnings
+```
+
 Then verify content quality:
 - a new engineer can identify owner, criticality, and architecture quickly;
 - on-call can execute first-response steps from docs;

@@ -88,6 +88,9 @@ python scripts/validate_portfolio.py examples --all --report reports/portfolio-v
 
 # 10) Keep facts fresh in CI (fail if latest dated fact is too old)
 python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --enforce-freshness
+
+# 11) Treat all warnings as CI failures (placeholders + freshness gaps)
+python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --fail-on-warnings
 ```
 
 ## Better example patterns (copy/paste starters)
@@ -129,6 +132,7 @@ python scripts/validate_portfolio.py examples --all --json
 python scripts/validate_portfolio.py examples --all --quality-gate 80
 python scripts/validate_portfolio.py examples --all --report reports/portfolio-validation.md
 python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --enforce-freshness
+python scripts/validate_portfolio.py examples --all --max-fact-age-days 90 --fail-on-warnings
 ```
 
 ## Core principles

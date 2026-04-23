@@ -107,6 +107,14 @@ def parse_args() -> argparse.Namespace:
             "traceable ISO date while --max-fact-age-days is set."
         ),
     )
+    parser.add_argument(
+        "--fail-on-warnings",
+        action="store_true",
+        help=(
+            "Fail when any warning is detected (placeholder content and/or freshness gaps). "
+            "Useful for CI policies that treat warnings as failures."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -415,10 +423,13 @@ def determine_exit_code(
     strict: bool,
     quality_gate: int | None,
     enforce_freshness: bool,
+    fail_on_warnings: bool,
 ) -> int:
     has_errors = any(result["status"] == "error" for result in results)
     has_missing = any(result["missing_files"] for result in results)
     has_placeholders = any(result["placeholder_hits"] for result in results)
+    has_freshness_hits = any(result["freshness_hits"] for result in results)
+    has_warnings = has_placeholders or has_freshness_hits
 
     if has_errors:
         return 2
@@ -426,7 +437,9 @@ def determine_exit_code(
         return 1
     if strict and has_placeholders:
         return 1
-    if enforce_freshness and any(result["freshness_hits"] for result in results):
+    if enforce_freshness and has_freshness_hits:
+        return 1
+    if fail_on_warnings and has_warnings:
         return 1
     if quality_gate is not None and any(result["quality_score"] < quality_gate for result in results):
         return 1
@@ -518,6 +531,7 @@ def main() -> int:
         args.strict,
         args.quality_gate,
         args.enforce_freshness,
+        args.fail_on_warnings,
     )
 
     if args.report:
@@ -547,10 +561,17 @@ def main() -> int:
                 "failed": sum(1 for result in results if result["missing_files"]),
                 "warnings": sum(1 for result in results if result["placeholder_hits"]),
                 "freshness_warnings": sum(1 for result in results if result["freshness_hits"]),
+                "total_warnings": sum(
+                    1 for result in results if result["placeholder_hits"] or result["freshness_hits"]
+                ),
                 "passed": sum(
                     1
                     for result in results
-                    if not result["missing_files"] and not result["placeholder_hits"]
+                    if (
+                        not result["missing_files"]
+                        and not result["placeholder_hits"]
+                        and not result["freshness_hits"]
+                    )
                 ),
                 "below_quality_gate": (
                     sum(
@@ -583,6 +604,12 @@ def main() -> int:
         return exit_code
     if exit_code == 1 and args.enforce_freshness:
         print("FAIL: One or more portfolios have stale or undated facts.")
+        return exit_code
+    if exit_code == 1 and args.fail_on_warnings:
+        print(
+            "FAIL: One or more portfolios have warnings "
+            "(placeholder content and/or freshness gaps)."
+        )
         return exit_code
     if exit_code == 1 and args.quality_gate is not None:
         print(f"FAIL: One or more portfolios scored below quality gate ({args.quality_gate}).")
