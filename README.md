@@ -44,7 +44,7 @@ Mode changes emphasis, not file names.
 ## Repository layout
 - `interview-protocol/` — central interviewer system prompt.
 - `templates/` — baseline markdown templates for each portfolio file.
-- `examples/` — sample portfolios (Exchange Online, OneDrive, NinjaOne RMM).
+- `examples/` — sample portfolios (Exchange Online, OneDrive, NinjaOne RMM, Customer Billing API, Snowflake Analytics Platform).
 - `wiring/` — implementation patterns for consuming context in tools and workflows.
 - `scripts/` — helper utilities such as structure validation.
 
@@ -71,6 +71,34 @@ python scripts/validate_portfolio.py my-system
 # 4) Optional strict mode (flags placeholders)
 python scripts/validate_portfolio.py my-system --strict
 ```
+
+## Better example patterns (copy/paste starters)
+Use these when replacing template placeholders so your portfolio becomes immediately actionable.
+
+### `system-identity.md` (good level of specificity)
+- **System:** Exchange Online (US tenant)
+- **Primary owner:** Messaging Platform Team (`messaging-platform@company.com`)
+- **Escalation path:** Service Desk → Messaging On-Call → M365 Architect
+- **SLA / criticality:** Tier 0, 99.9% availability target
+
+### `operations.md` (incident-first runbook examples)
+- **P1 symptom:** Users cannot send external mail.
+- **First 10 minutes:** Check Microsoft 365 Service Health, verify recent transport rule changes, compare impact by region.
+- **Rollback action:** Disable last modified transport rule and re-test with synthetic mailbox.
+- **Escalate when:** >20% impacted users or no mitigation within 30 minutes.
+
+### `dependencies-and-integrations.md` (dependency mapping example)
+| Dependency | Type | Why it matters | Owner | Failure impact |
+|---|---|---|---|---|
+| Entra ID Connect | Identity sync | User/mailbox identity consistency | IAM Team | New accounts fail to provision |
+| SMTP relay appliance | Mail flow | Legacy app email delivery | Network Team | Application alerts are dropped |
+| SIEM connector | Security monitoring | Audit/event ingestion | SecOps | Delayed detection and compliance gaps |
+
+### `known-issues-and-constraints.md` (risk statement example)
+- **Constraint:** Shared tenant throttling cannot be disabled.
+- **Operational effect:** Bulk migration windows are capped and must be staged.
+- **Current mitigation:** Batch size limits + off-peak scheduling.
+- **Follow-up owner/date:** Messaging Platform Team — review quarterly.
 
 ## Validation helper
 Run the validator script against any portfolio folder to confirm required files and optionally flag placeholders:

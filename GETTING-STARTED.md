@@ -49,3 +49,14 @@ Then verify content quality:
 
 ## 5) Integrate into workflows
 Use guides in `wiring/` to consume the portfolio in MCP resources, service catalogs, AI system prompts, context packs, and operations workflows.
+
+## Quick quality examples (what "good" looks like)
+Use the patterns below to increase signal quality while filling templates:
+
+- **Owner fields:** Prefer a named team plus a routable alias (for example, `Identity Platform Team` + `identity-platform@company.com`) instead of a single person.
+- **Runbooks:** Include trigger, first checks, rollback, and escalation threshold (for example, "rollback if no recovery in 15 minutes").
+- **Dependencies:** Document both technical dependency and business impact (for example, "if SSO fails, external customers cannot access billing portal").
+- **Known issues:** Track mitigation status and next review date, not just the problem statement.
+- **Decisions:** Record alternatives considered and why they were rejected.
+
+If unsure, start from the closest portfolio in `examples/` and rewrite each section with your system's real owners, tooling, and constraints.
