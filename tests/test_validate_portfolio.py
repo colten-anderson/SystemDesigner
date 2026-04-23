@@ -144,3 +144,33 @@ def test_fail_on_warnings_catches_placeholders(tmp_path: Path) -> None:
     result = run_validate(str(portfolio), "--fail-on-warnings")
     assert result.returncode == 1
     assert "have warnings" in result.stdout
+
+
+def test_templates_dir_override_is_supported(tmp_path: Path) -> None:
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "system-identity.md").write_text(
+        "## Summary\n## Output Structure\n- **Custom Field:**\n## For AI + Human Use\n## Open Questions / TBDs\n",
+        encoding="utf-8",
+    )
+
+    portfolio = tmp_path / "portfolio"
+    portfolio.mkdir()
+    (portfolio / "system-identity.md").write_text(
+        "## Summary\n## Output Structure\n- **Custom Field:** value\n## For AI + Human Use\n## Open Questions / TBDs\n",
+        encoding="utf-8",
+    )
+
+    result = run_validate(str(portfolio), "--templates-dir", str(templates_dir))
+    assert result.returncode == 1
+    assert "Missing required files" in result.stdout
+    assert "system-identity.md" in result.stdout
+
+
+def test_templates_dir_not_found_returns_usage_error(tmp_path: Path) -> None:
+    portfolio = tmp_path / "portfolio"
+    portfolio.mkdir()
+
+    result = run_validate(str(portfolio), "--templates-dir", str(tmp_path / "does-not-exist"))
+    assert result.returncode == 2
+    assert "Template directory not found" in result.stdout

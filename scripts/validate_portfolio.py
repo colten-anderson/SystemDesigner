@@ -35,6 +35,7 @@ PLACEHOLDER_PATTERNS = [
 OUTPUT_FIELD_REGEX = re.compile(r"^-\s+\*\*(.+?):\*\*", re.MULTILINE)
 HEADER_REGEX = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 ISO_DATE_REGEX = re.compile(r"\b(20\d{2}-\d{2}-\d{2})\b")
+DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,15 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Fail when any warning is detected (placeholder content and/or freshness gaps). "
             "Useful for CI policies that treat warnings as failures."
+        ),
+    )
+    parser.add_argument(
+        "--templates-dir",
+        type=Path,
+        default=DEFAULT_TEMPLATES_DIR,
+        help=(
+            "Directory containing template markdown files used to infer expected "
+            "output fields (defaults to repository templates/)."
         ),
     )
     return parser.parse_args()
@@ -535,8 +545,11 @@ def main() -> int:
         print("ERROR: --only-portfolios requires --all.")
         return 2
 
-    templates_dir = Path(__file__).resolve().parents[1] / "templates"
-    expected_fields_by_file = load_expected_fields(templates_dir)
+    try:
+        expected_fields_by_file = load_expected_fields(args.templates_dir)
+    except ValueError as error:
+        print(f"ERROR: {error}")
+        return 2
 
     portfolio_paths = collect_portfolios(
         args.portfolio_path,
