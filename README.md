@@ -80,6 +80,9 @@ python scripts/validate_portfolio.py my-system --strict
 # 6) Validate every portfolio in a parent directory
 python scripts/validate_portfolio.py examples --all
 
+# 6b) In mixed directories, validate only folders that look like portfolios
+python scripts/validate_portfolio.py . --all --only-portfolios
+
 # 7) Export machine-readable results
 python scripts/validate_portfolio.py examples --all --json
 
