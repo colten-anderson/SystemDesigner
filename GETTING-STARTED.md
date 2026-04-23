@@ -59,6 +59,18 @@ If you need to integrate validation into CI pipelines, add `--json` for machine-
 python scripts/validate_portfolio.py portfolios --all --json
 ```
 
+You can also enforce a documentation quality gate score (0-100):
+
+```bash
+python scripts/validate_portfolio.py portfolios --all --quality-gate 80
+```
+
+And generate a markdown review artifact for audits or PRs:
+
+```bash
+python scripts/validate_portfolio.py portfolios --all --report reports/portfolio-validation.md
+```
+
 Then verify content quality:
 - a new engineer can identify owner, criticality, and architecture quickly;
 - on-call can execute first-response steps from docs;
