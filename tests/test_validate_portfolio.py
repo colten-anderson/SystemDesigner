@@ -37,3 +37,43 @@ def test_report_written(tmp_path: Path) -> None:
     report_text = report_path.read_text(encoding="utf-8")
     assert "# Portfolio Validation Report" in report_text
     assert "Quality score" in report_text
+
+
+def test_enforce_freshness_requires_max_fact_age() -> None:
+    result = run_validate("examples", "--all", "--enforce-freshness")
+    assert result.returncode == 2
+    assert "--enforce-freshness requires --max-fact-age-days" in result.stdout
+
+
+def test_freshness_gate_detects_stale_or_undated_content(tmp_path: Path) -> None:
+    portfolio = tmp_path / "portfolio"
+    portfolio.mkdir()
+
+    required_files = [
+        "system-identity.md",
+        "business-context.md",
+        "architecture.md",
+        "tech-stack.md",
+        "dependencies-and-integrations.md",
+        "data.md",
+        "security-and-access.md",
+        "operations.md",
+        "known-issues-and-constraints.md",
+        "decisions-and-history.md",
+    ]
+
+    for file_name in required_files:
+        (portfolio / file_name).write_text(
+            "## Summary\n## Output Structure\n## For AI + Human Use\n## Open Questions / TBDs\n"
+            "Last reviewed: 2020-01-01\n",
+            encoding="utf-8",
+        )
+
+    result = run_validate(
+        str(portfolio),
+        "--max-fact-age-days",
+        "30",
+        "--enforce-freshness",
+    )
+    assert result.returncode == 1
+    assert "stale or undated facts" in result.stdout
