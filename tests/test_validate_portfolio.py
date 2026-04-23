@@ -21,6 +21,7 @@ def test_examples_json_includes_quality_score() -> None:
     assert result.returncode == 0
     assert '"quality_score"' in result.stdout
     assert '"average_quality_score"' in result.stdout
+    assert '"total_warnings"' in result.stdout
 
 
 def test_quality_gate_enforced() -> None:
@@ -77,3 +78,32 @@ def test_freshness_gate_detects_stale_or_undated_content(tmp_path: Path) -> None
     )
     assert result.returncode == 1
     assert "stale or undated facts" in result.stdout
+
+
+def test_fail_on_warnings_catches_placeholders(tmp_path: Path) -> None:
+    portfolio = tmp_path / "portfolio"
+    portfolio.mkdir()
+
+    required_files = [
+        "system-identity.md",
+        "business-context.md",
+        "architecture.md",
+        "tech-stack.md",
+        "dependencies-and-integrations.md",
+        "data.md",
+        "security-and-access.md",
+        "operations.md",
+        "known-issues-and-constraints.md",
+        "decisions-and-history.md",
+    ]
+
+    for file_name in required_files:
+        (portfolio / file_name).write_text(
+            "## Summary\n## Output Structure\n## For AI + Human Use\n## Open Questions / TBDs\n"
+            "TODO: fill this in\n",
+            encoding="utf-8",
+        )
+
+    result = run_validate(str(portfolio), "--fail-on-warnings")
+    assert result.returncode == 1
+    assert "have warnings" in result.stdout
