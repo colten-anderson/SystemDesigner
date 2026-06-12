@@ -136,15 +136,10 @@ def test_full_scripted_interview_passes_quality_gate_80(plan, tmp_path) -> None:
     assert "Quality score" in result.stdout
 
 
-def test_early_hangup_saves_partial_and_still_passes_gate(plan, tmp_path) -> None:
-    out_dir = tmp_path / "portfolio"
-    state = InterviewState(output_dir=str(out_dir))
-    store = StateStore(out_dir / ".interview-state.json")
-    orchestrator = InterviewOrchestrator(plan, state, store)
+def _hangup_script() -> list[dict]:
+    """Mode + core facts + the first section's first field, then nothing."""
 
-    # Script covers only mode + core facts + the first section's first field,
-    # then the user "hangs up" (input_fn returns None).
-    script = [
+    return [
         {"tool_calls": [{"name": "set_mode", "arguments": {"mode": "A"}}]},
         {
             "tool_calls": [
@@ -170,22 +165,101 @@ def test_early_hangup_saves_partial_and_still_passes_gate(plan, tmp_path) -> Non
         },
         {"text": "And which aliases are in use?"},
     ]
-    llm = ScriptedLLM(script)
 
+
+def test_early_hangup_writes_partial_and_stays_resumable(plan, tmp_path) -> None:
+    out_dir = tmp_path / "portfolio"
+    state = InterviewState(output_dir=str(out_dir))
+    store = StateStore(out_dir / ".interview-state.json")
+    orchestrator = InterviewOrchestrator(plan, state, store)
+    llm = ScriptedLLM(_hangup_script())
+
+    # The user "hangs up" (input_fn returns None) mid-section.
     written, _ = asyncio.run(_drive(orchestrator, llm, ["hi", "it's exchange", None]))
 
-    assert orchestrator.is_complete()
+    # A hang-up pauses; it does NOT finalize — the session stays resumable.
+    assert not orchestrator.is_complete()
+    assert orchestrator.pause_requested
+    assert state.phase == "SECTIONS"
     assert len(written) == 10
-    # State file persisted continuously.
     assert (out_dir / ".interview-state.json").exists()
 
+    # The partial portfolio still passes the gate (unrecorded fields are
+    # rendered as TBDs with the owning team, without mutating state).
     result = run_validator(out_dir, "--quality-gate", "80")
     assert result.returncode == 0, result.stdout
-
-    # The one real answer survived; the rest are explicit TBDs with owner.
     identity = (out_dir / "system-identity.md").read_text(encoding="utf-8")
     assert "Microsoft Exchange Online" in identity
     assert "TBD (owner:" in identity
+    # State was not TBD-filled: only the one real answer is recorded.
+    assert list(state.files["system-identity.md"].fields) == ["System name"]
+
+
+def test_hangup_then_resume_finishes_the_interview(plan, tmp_path) -> None:
+    out_dir = tmp_path / "portfolio"
+    store = StateStore(out_dir / ".interview-state.json")
+
+    # Call 1: drops mid-way through the first section.
+    state = InterviewState(output_dir=str(out_dir))
+    first = InterviewOrchestrator(plan, state, store)
+    asyncio.run(_drive(first, ScriptedLLM(_hangup_script()), ["hi", "exchange", None]))
+    assert not first.is_complete()
+
+    # Call 2: resume from the saved state file and finish everything.
+    resumed_state = store.load()
+    second = InterviewOrchestrator(plan, resumed_state, store)
+    assert second.is_resuming()
+    assert "Resuming" in second.opening_message() or "Hello again" in second.opening_message()
+
+    finish_turns: list[dict] = []
+    for section in plan.sections:
+        calls = []
+        for field in section.output_fields:
+            if section.file_name == "system-identity.md" and field == "System name":
+                continue  # already answered before the drop
+            calls.append(
+                {
+                    "name": "record_answer",
+                    "arguments": {
+                        "file": section.file_name,
+                        "field": field,
+                        "value": f"Resumed-session answer for {field} with owner and details.",
+                    },
+                }
+            )
+        calls.append(
+            {
+                "name": "set_file_summary",
+                "arguments": {
+                    "file": section.file_name,
+                    "summary": f"Recap of {section.title} confirmed by the team after resuming.",
+                },
+            }
+        )
+        calls.append({"name": "next_section", "arguments": {}})
+        finish_turns.append({"tool_calls": calls})
+    finish_turns.append(
+        {
+            "text": "All done, thanks everyone!",
+            "tool_calls": [{"name": "end_interview", "arguments": {"partial": False}}],
+        }
+    )
+
+    written, outputs = asyncio.run(
+        _drive(second, ScriptedLLM(finish_turns), ["we're back"])
+    )
+
+    assert second.is_complete()
+    # The resumed session continued the SAME session, from the saved cursor.
+    assert resumed_state.session_id == state.session_id
+    assert len(written) == 10
+    # The resume opening re-anchored the conversation.
+    assert any("Hello again" in line for line in outputs)
+
+    result = run_validator(out_dir, "--quality-gate", "80")
+    assert result.returncode == 0, result.stdout
+    identity = (out_dir / "system-identity.md").read_text(encoding="utf-8")
+    assert "Microsoft Exchange Online" in identity  # pre-drop answer survived
 
 
 def test_gated_next_section_steers_scripted_llm_error_path(plan, tmp_path) -> None:
@@ -199,7 +273,9 @@ def test_gated_next_section_steers_scripted_llm_error_path(plan, tmp_path) -> No
         {"text": "Right, I need the mode first. Which mode is it?"},
     ]
     llm = ScriptedLLM(script)
-    asyncio.run(_drive(orchestrator, llm, ["hello", None]))
-    # Never advanced into sections; ended via partial save on hang-up.
-    assert state.files[REQUIRED_FILES[0]].fields  # TBD-filled by partial end
+    written, _ = asyncio.run(_drive(orchestrator, llm, ["hello", None]))
+    # Never advanced into sections; the hang-up paused without mutating state.
     assert state.mode is None
+    assert not state.files[REQUIRED_FILES[0]].fields
+    # The portfolio is still rendered (every field as a defensive TBD).
+    assert len(written) == 10

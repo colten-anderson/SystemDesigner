@@ -15,6 +15,7 @@ from typing import Awaitable, Callable
 from ..llm import InterviewLLM
 from ..markdown_writer import write_portfolio
 from ..orchestrator import InterviewOrchestrator
+from ..state import resume_digest
 from ..tools import TOOL_DEFINITIONS, dispatch_tool, tool_result_text
 
 # Guards against a misbehaving model looping on tools without ever finishing.
@@ -28,24 +29,40 @@ async def run_text_interview(
     input_fn: Callable[[], Awaitable[str | None]],
     output_fn: Callable[[str], None],
 ) -> list[Path]:
-    """Run the interview loop until completion or end-of-input.
+    """Run the interview loop until completion, pause, or end-of-input.
 
-    ``input_fn`` returns the next user utterance or ``None`` on end-of-input
-    (hang-up equivalent). Returns the list of written portfolio files.
+    ``input_fn`` returns the next user utterance or ``None`` on end-of-input.
+    End-of-input and the pause_interview tool leave the state RESUMABLE (only
+    an explicit end_interview finalizes it); the partial portfolio is written
+    either way. Returns the list of written portfolio files.
     """
 
     messages: list[dict] = []
+    if orchestrator.is_resuming():
+        # Re-anchor the model with where the previous call left off.
+        messages.append(
+            {
+                "role": "user",
+                "content": "<session-restored>\n"
+                + resume_digest(orchestrator.state, orchestrator.plan)
+                + "\n</session-restored>",
+            }
+        )
 
     opening = orchestrator.opening_message()
     output_fn(opening)
     orchestrator.on_assistant_text(opening)
+    if messages:
+        # Resume path: the digest (a user message) comes first, so the spoken
+        # opening can be part of the history. Fresh runs must start with a
+        # user message, so the opening stays out of the API history there.
+        messages.append({"role": "assistant", "content": opening})
 
-    while not orchestrator.is_complete():
+    while not orchestrator.is_complete() and not orchestrator.pause_requested:
         user_text = await input_fn()
         if user_text is None:
-            # The "call dropped / user left" path: save partial progress.
-            if not orchestrator.is_complete():
-                orchestrator.end_interview(partial=True)
+            # Call dropped / user left: keep the state resumable.
+            orchestrator.pause_requested = True
             break
         user_text = user_text.strip()
         if not user_text:
@@ -88,9 +105,12 @@ async def run_text_interview(
                 )
             messages.append({"role": "user", "content": results})
 
-            if orchestrator.is_complete():
+            if orchestrator.is_complete() or orchestrator.pause_requested:
                 break
 
+    # The writer renders unrecorded fields as TBDs without mutating state, so
+    # a paused interview produces a complete partial portfolio AND remains
+    # resumable from the saved state file.
     written = write_portfolio(
         orchestrator.state, orchestrator.plan, Path(orchestrator.state.output_dir)
     )

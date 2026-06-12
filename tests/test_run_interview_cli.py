@@ -120,10 +120,12 @@ def test_text_mode_with_scripted_llm_end_to_end(tmp_path: Path) -> None:
     assert "[interviewer]" in result.stdout
     assert "Wrote 10 portfolio files" in result.stdout
     assert "Quality score" in result.stdout
+    # Stdin ran out mid-interview, so the run paused (resumable), with a hint.
+    assert "--resume" in result.stdout
 
     assert (out_dir / ".interview-state.json").exists()
     state = json.loads((out_dir / ".interview-state.json").read_text(encoding="utf-8"))
-    assert state["phase"] == "ENDED"
+    assert state["phase"] == "SECTIONS"  # paused, not finalized
     assert state["system_facts"]["system_name"] == "Billing API"
 
     identity = (out_dir / "system-identity.md").read_text(encoding="utf-8")
@@ -150,10 +152,10 @@ def test_text_mode_resume_continues_session(tmp_path: Path) -> None:
     state_file = out_dir / ".interview-state.json"
     saved = json.loads(state_file.read_text(encoding="utf-8"))
     assert saved["mode"] == "C"
+    assert saved["phase"] == "CORE_FACTS"  # paused mid-way, resumable
     session_id = saved["session_id"]
 
-    # Resume: same session id continues (interview already ENDED here, but the
-    # resume path must load the same session and re-run to completion).
+    # Resume: the same session continues with a "welcome back" opening.
     script2 = [{"text": "Welcome back."}]
     script2_path = tmp_path / "s2.json"
     script2_path.write_text(json.dumps(script2), encoding="utf-8")
@@ -164,5 +166,7 @@ def test_text_mode_resume_continues_session(tmp_path: Path) -> None:
     )
     assert second.returncode == 0, second.stdout + second.stderr
     assert "Resuming interview session" in second.stdout
+    assert "Hello again" in second.stdout  # resume-aware opening
     resumed = json.loads(state_file.read_text(encoding="utf-8"))
     assert resumed["session_id"] == session_id
+    assert resumed["mode"] == "C"  # progress survived the round trip

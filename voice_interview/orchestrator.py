@@ -48,6 +48,9 @@ class InterviewOrchestrator:
         self.state = state
         self.store = store
         self.thin_answer_min_words = thin_answer_min_words
+        # Transient (not persisted): set when the conversation should stop
+        # WITHOUT finalizing, leaving the state file resumable.
+        self.pause_requested = False
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -416,6 +419,7 @@ class InterviewOrchestrator:
         return {"status": "ok", "section": self._section_payload(current)}
 
     def pause_interview(self) -> dict:
+        self.pause_requested = True
         self._save()
         return {
             "status": "ok",
@@ -478,7 +482,14 @@ class InterviewOrchestrator:
         self.state.add_transcript("assistant", text)
         self._save()
 
+    def is_resuming(self) -> bool:
+        """True when this session already has progress from a previous call."""
+
+        return self.state.mode is not None or bool(self.state.transcript)
+
     def opening_message(self) -> str:
+        if self.is_resuming():
+            return self._resume_opening_message()
         mode_lines = "; ".join(
             f"{key}: {label}" for key, label in MODE_LABELS.items()
         )
@@ -488,6 +499,45 @@ class InterviewOrchestrator:
             "documentation portfolio. First question: which mode best describes "
             f"the system? {mode_lines}."
         )
+
+    def _resume_opening_message(self) -> str:
+        system = self.state.system_facts.get("system_name")
+        subject = f" about {system}" if system else ""
+        if self.state.phase == st.PHASE_MODE_SELECT:
+            return (
+                "Hello again! Resuming our SystemDesigner interview. We hadn't "
+                "picked a mode yet — which mode best describes the system? "
+                + "; ".join(f"{k}: {v}" for k, v in MODE_LABELS.items())
+                + "."
+            )
+        if self.state.phase == st.PHASE_CORE_FACTS:
+            missing = [k for k in CORE_FACT_KEYS if k not in self.state.system_facts]
+            return (
+                f"Hello again! Resuming our interview{subject}. We were "
+                "collecting the basics — I still need: "
+                + ", ".join(m.replace("_", " ") for m in missing)
+                + "."
+            )
+        if self.state.phase == st.PHASE_SECTIONS and self.state.current_file:
+            current = self.state.current_file
+            remaining = self._missing_fields(current)
+            section = self.plan.section_for(current)
+            detail = (
+                f" I still need: {', '.join(remaining[:4])}"
+                + ("." if len(remaining) <= 4 else " and a few more.")
+                if remaining
+                else " We just need to recap it before moving on."
+            )
+            return (
+                f"Hello again! Resuming our interview{subject}. We were working "
+                f"through {section.title.lower()}.{detail}"
+            )
+        if self.state.phase == st.PHASE_WRAP_UP:
+            return (
+                f"Hello again! Resuming our interview{subject}. All sections are "
+                "done — let's recap the open questions and wrap up."
+            )
+        return f"Hello again! Our interview{subject} is already complete."
 
     def system_prompt(self) -> str:
         """Assemble the LLM system prompt: protocol text + voice/tool rules."""

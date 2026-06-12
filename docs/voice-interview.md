@@ -93,20 +93,31 @@ tune `DTMF_INITIAL_DELAY_S` / `DTMF_CONFIRM_DELAY_S` in `.env`.
 
 Progress is saved to `<out-dir>/.interview-state.json` **after every recorded
 answer** (atomic writes), so a dropped call loses at most the sentence in
-flight. Resume any time:
+flight.
+
+There are two distinct ways an interview stops:
+
+- **Pause** — the call drops, someone hangs up, Ctrl-D in text mode, or the
+  team asks the agent to pause. The partial portfolio is written immediately
+  (unanswered fields render as `TBD (owner: ...; next: ...)`), but the saved
+  state is **not** finalized: every answer so far is preserved and the session
+  resumes exactly where it left off. The CLI prints the resume command.
+- **End** — the agent (with the team) explicitly ends the interview. Remaining
+  unknowns are recorded as owned TBDs in the state itself and the session is
+  finalized.
 
 ```bash
 python scripts/run_interview.py --resume portfolios/my-system/.interview-state.json
 ```
 
 Resume re-joins in the original mode (the saved dial-in details are reused;
-pass `--join` to override) and re-anchors the model with a digest of mode,
-facts, per-file completion, and the last transcript turns.
+pass `--join` to override), greets the room with a "welcome back — we were
+working through <section>" opening, and re-anchors the model with a digest of
+mode, facts, per-file completion, and the last transcript turns.
 
-Ending early (hang-up, Ctrl-D in text mode, or telling the agent to stop)
-still writes **all 10 files**: unanswered fields become explicit
-`TBD (owner: ...; next: ...)` entries, so the partial portfolio passes the
-quality gate and the unknowns are actionable follow-ups rather than silence.
+Either way the output directory always contains **all 10 files** that pass the
+quality gate — partial portfolios carry explicit, actionable unknowns rather
+than silence.
 
 ## Quality gate and TBD warnings
 

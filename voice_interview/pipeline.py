@@ -54,7 +54,10 @@ def _register_tools(llm, task, orchestrator: InterviewOrchestrator) -> None:
         async def handler(params):  # pipecat FunctionCallParams
             result = dispatch_tool(orchestrator, tool_name, params.arguments or {})
             await params.result_callback(result)
-            if orchestrator.is_complete():
+            if orchestrator.is_complete() or orchestrator.pause_requested:
+                # Let the goodbye line get spoken, then stop the pipeline.
+                # A pause leaves the state file resumable; only end_interview
+                # finalizes the interview.
                 asyncio.create_task(_finish_after_grace())
 
         return handler
@@ -147,13 +150,23 @@ async def run_voice_interview(
     llm = AnthropicLLMService(api_key=config.anthropic_api_key, model=config.llm_model)
 
     opening = orchestrator.opening_message()
-    context = LLMContext(
-        messages=[
-            {"role": "system", "content": orchestrator.system_prompt()},
-            {"role": "assistant", "content": opening},
-        ],
-        tools=_build_tools_schema(),
-    )
+    context_messages: list[dict] = [
+        {"role": "system", "content": orchestrator.system_prompt()},
+    ]
+    if orchestrator.is_resuming():
+        # Re-anchor the model with where the previous call left off.
+        from .state import resume_digest
+
+        context_messages.append(
+            {
+                "role": "user",
+                "content": "<session-restored>\n"
+                + resume_digest(orchestrator.state, orchestrator.plan)
+                + "\n</session-restored>",
+            }
+        )
+    context_messages.append({"role": "assistant", "content": opening})
+    context = LLMContext(messages=context_messages, tools=_build_tools_schema())
     context_aggregator = LLMContextAggregatorPair(context)
     user_log, assistant_log = _build_transcript_loggers(orchestrator)
 
@@ -215,10 +228,12 @@ async def run_voice_interview(
     finally:
         await connector.disconnect()
 
-    # Always produce the portfolio: complete interviews end via end_interview;
-    # dropped calls get an explicit partial save.
+    # Always produce the portfolio. The writer renders unrecorded fields as
+    # TBDs without mutating state, so a dropped or paused call yields a
+    # complete partial portfolio AND remains resumable; only an explicit
+    # end_interview (by the agent) finalizes the state.
     if not orchestrator.is_complete():
-        orchestrator.end_interview(partial=True)
+        orchestrator.pause_interview()
     return write_portfolio(
         orchestrator.state, orchestrator.plan, Path(orchestrator.state.output_dir)
     )

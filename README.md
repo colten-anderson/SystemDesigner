@@ -129,8 +129,10 @@ python scripts/run_interview.py --resume portfolios/my-system/.interview-state.j
 ```
 The agent introduces itself, runs the mode picker and all 10 files, records
 explicit TBDs with owners for unknowns, saves state continuously, and
-validates the finished portfolio at quality gate 80. Required keys and the
-Teams-vs-Slack support matrix: [docs/voice-interview.md](docs/voice-interview.md).
+validates the finished portfolio at quality gate 80. Dropped calls and pauses
+keep the session resumable (the partial portfolio is written either way); only
+an explicit end finalizes it. Required keys and the Teams-vs-Slack support
+matrix: [docs/voice-interview.md](docs/voice-interview.md).
 
 ### 3) Validate portfolio quality and completeness
 ```bash

@@ -112,6 +112,18 @@ def build_orchestrator(args: argparse.Namespace, config: InterviewConfig):
     return plan, InterviewOrchestrator(plan, state, store)
 
 
+def print_resume_hint_if_paused(orchestrator) -> int:
+    if orchestrator.is_complete():
+        return 0
+    state_file = Path(orchestrator.state.output_dir) / STATE_FILE_NAME
+    print(
+        "\nThe interview was paused, not finished — every answer so far is "
+        "saved. Continue any time with:\n"
+        f"  python scripts/run_interview.py --resume {state_file}"
+    )
+    return 0
+
+
 def validate_output(out_dir: Path, quality_gate: int) -> int:
     if quality_gate < 0:
         return 0
@@ -171,6 +183,7 @@ async def run_text_mode(args: argparse.Namespace, config: InterviewConfig) -> in
     )
     out_dir = Path(orchestrator.state.output_dir)
     print(f"\n\nWrote {len(written)} portfolio files to {out_dir}")
+    print_resume_hint_if_paused(orchestrator)
     return validate_output(out_dir, args.quality_gate)
 
 
@@ -233,6 +246,7 @@ async def run_voice_mode(args: argparse.Namespace, config: InterviewConfig, loca
     )
     out_dir = Path(orchestrator.state.output_dir)
     print(f"\nWrote {len(written)} portfolio files to {out_dir}")
+    print_resume_hint_if_paused(orchestrator)
     return validate_output(out_dir, args.quality_gate)
 
 
