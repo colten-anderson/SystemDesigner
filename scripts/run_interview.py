@@ -124,9 +124,11 @@ def build_orchestrator(args: argparse.Namespace, config: InterviewConfig):
 
 
 def print_resume_hint_if_paused(orchestrator) -> int:
+    out_dir = Path(orchestrator.state.output_dir)
+    print(f"Follow-up list (owners and open TBDs): {out_dir / 'interview-summary.md'}")
     if orchestrator.is_complete():
         return 0
-    state_file = Path(orchestrator.state.output_dir) / STATE_FILE_NAME
+    state_file = out_dir / STATE_FILE_NAME
     print(
         "\nThe interview was paused, not finished — every answer so far is "
         "saved. Continue any time with:\n"

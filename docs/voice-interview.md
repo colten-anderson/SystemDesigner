@@ -119,6 +119,11 @@ Either way the output directory always contains **all 10 files** that pass the
 quality gate — partial portfolios carry explicit, actionable unknowns rather
 than silence.
 
+Every run also writes **`interview-summary.md`** next to the portfolio: a
+per-file coverage table, every TBD as a follow-up row (field, owner, next
+step), the open questions raised during the call, and — for paused runs — the
+exact resume command. Send it to the team as the post-meeting action list.
+
 ## Quality gate and TBD warnings
 
 The interview output is scored by the existing validator

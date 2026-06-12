@@ -25,6 +25,27 @@ from .tools import TOOL_DEFINITIONS, dispatch_tool
 END_GRACE_PERIOD_S = 6.0
 
 
+def _print_progress(tool_name: str, result: dict, orchestrator) -> None:
+    """Console progress lines so the operator can follow the call live."""
+
+    if result.get("status") == "error":
+        return
+    if tool_name in ("next_section", "skip_section"):
+        section = result.get("section")
+        if section:
+            done = orchestrator.state.section_cursor
+            total = len(orchestrator.state.section_order)
+            print(f"[progress] section {done + 1}/{total}: {section['file']}")
+        else:
+            print("[progress] all sections complete — wrapping up")
+    elif tool_name == "set_mode":
+        print(f"[progress] mode selected: {result.get('mode')} ({result.get('mode_label')})")
+    elif tool_name == "end_interview":
+        print("[progress] interview ended; writing portfolio")
+    elif tool_name == "pause_interview":
+        print("[progress] interview paused; progress saved")
+
+
 def _build_tools_schema():
     from pipecat.adapters.schemas.function_schema import FunctionSchema
     from pipecat.adapters.schemas.tools_schema import ToolsSchema
@@ -54,6 +75,7 @@ def _register_tools(llm, task, orchestrator: InterviewOrchestrator) -> None:
         async def handler(params):  # pipecat FunctionCallParams
             result = dispatch_tool(orchestrator, tool_name, params.arguments or {})
             await params.result_callback(result)
+            _print_progress(tool_name, result, orchestrator)
             if orchestrator.is_complete() or orchestrator.pause_requested:
                 # Let the goodbye line get spoken, then stop the pipeline.
                 # A pause leaves the state file resumable; only end_interview
@@ -244,6 +266,9 @@ async def run_voice_interview(
     # end_interview (by the agent) finalizes the state.
     if not orchestrator.is_complete():
         orchestrator.pause_interview()
-    return write_portfolio(
-        orchestrator.state, orchestrator.plan, Path(orchestrator.state.output_dir)
-    )
+    from .report import write_interview_summary
+
+    out_dir = Path(orchestrator.state.output_dir)
+    written = write_portfolio(orchestrator.state, orchestrator.plan, out_dir)
+    write_interview_summary(orchestrator.state, orchestrator.plan, out_dir)
+    return written

@@ -15,11 +15,38 @@ from typing import Awaitable, Callable
 from ..llm import InterviewLLM
 from ..markdown_writer import write_portfolio
 from ..orchestrator import InterviewOrchestrator
+from ..report import write_interview_summary
 from ..state import resume_digest
 from ..tools import TOOL_DEFINITIONS, dispatch_tool, tool_result_text
 
 # Guards against a misbehaving model looping on tools without ever finishing.
 MAX_TOOL_ROUNDS_PER_TURN = 60
+
+# Keep full tool-result JSON only for the most recent rounds; older results
+# are already captured in the state file, so eliding them saves real input
+# tokens on every subsequent turn of a long interview.
+TOOL_RESULT_KEEP_ROUNDS = 3
+ELIDED_TOOL_RESULT = '{"status": "ok", "note": "elided; recorded in interview state"}'
+
+
+def prune_old_tool_results(messages: list[dict], keep_rounds: int = TOOL_RESULT_KEEP_ROUNDS) -> None:
+    """Replace the content of all but the last N tool-result rounds in place.
+
+    The message structure (tool_use/tool_result pairing) is preserved — only
+    the result payload text is shortened, which is safe for the API.
+    """
+
+    result_rounds = [
+        message
+        for message in messages
+        if message["role"] == "user"
+        and isinstance(message["content"], list)
+        and any(block.get("type") == "tool_result" for block in message["content"])
+    ]
+    for message in result_rounds[:-keep_rounds] if keep_rounds else result_rounds:
+        for block in message["content"]:
+            if block.get("type") == "tool_result":
+                block["content"] = ELIDED_TOOL_RESULT
 
 
 async def run_text_interview(
@@ -69,6 +96,7 @@ async def run_text_interview(
             continue
         orchestrator.on_user_transcript(user_text)
         messages.append({"role": "user", "content": user_text})
+        prune_old_tool_results(messages)
 
         for _ in range(MAX_TOOL_ROUNDS_PER_TURN):
             turn = await llm.step(orchestrator.system_prompt(), messages, TOOL_DEFINITIONS)
@@ -111,7 +139,7 @@ async def run_text_interview(
     # The writer renders unrecorded fields as TBDs without mutating state, so
     # a paused interview produces a complete partial portfolio AND remains
     # resumable from the saved state file.
-    written = write_portfolio(
-        orchestrator.state, orchestrator.plan, Path(orchestrator.state.output_dir)
-    )
+    out_dir = Path(orchestrator.state.output_dir)
+    written = write_portfolio(orchestrator.state, orchestrator.plan, out_dir)
+    write_interview_summary(orchestrator.state, orchestrator.plan, out_dir)
     return written
