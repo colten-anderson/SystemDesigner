@@ -27,7 +27,7 @@ def run_cli(*args: str, stdin: str = "", env_extra: dict | None = None):
 def test_requires_a_mode() -> None:
     result = run_cli()
     assert result.returncode == 2
-    assert "--join, --text, --local-audio, or --resume" in result.stdout
+    assert "--join, --text, --local-audio, --resume, or --check" in result.stdout
 
 
 def test_join_and_text_are_mutually_exclusive() -> None:

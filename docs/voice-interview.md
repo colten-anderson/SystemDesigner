@@ -128,6 +128,49 @@ validator's *placeholder warning*; this is intentional and consistent with the
 protocol's "capture unknowns explicitly" rule. `--strict` runs will flag them
 until the owners fill the gaps — that's the point.
 
+## Cost controls
+
+An hour-long interview is dozens of LLM turns over a growing transcript. The
+defaults are tuned to keep that cheap:
+
+- **Prompt caching is ON** in the voice pipeline (and the text mode). The
+  system prompt, tool definitions, and conversation prefix are re-sent every
+  turn; caching cuts that repeated input to ~10% of full price after the
+  first turn — the dominant saving on long calls.
+- **Output tokens are capped** (`LLM_MAX_TOKENS`, default 1024). Spoken turns
+  are one or two sentences; the cap bounds the cost of any runaway turn.
+- **Model choice** is one flag (`--model`) or env var (`LLM_MODEL`):
+
+  | Model | Input/Output per MTok | When |
+  |---|---|---|
+  | `claude-opus-4-8` (default) | $5 / $25 | Best interview quality — probing follow-ups, mode-aware judgment |
+  | `claude-sonnet-4-6` | $3 / $15 | ~40% cheaper and lower latency; very good for routine interviews |
+  | `claude-haiku-4-5` | $1 / $5 | Cheapest; fine for dry runs and demos, weaker follow-up judgment |
+
+- The other meters are usage-based and independent of this repo's code:
+  Deepgram STT and Cartesia TTS per audio minute, and Daily per PSTN
+  dial-out minute. `--text` mode costs only LLM tokens; `--local-audio`
+  skips telephony entirely. Use those for rehearsals, and save the dialed
+  call for the real interview.
+
+```bash
+# Cheapest realistic rehearsal: text mode + small model
+python scripts/run_interview.py --text --model claude-haiku-4-5
+```
+
+## Preflight check
+
+Run this before the meeting — it verifies keys, installed dependencies, and
+(when a Daily key is present) that your Daily domain actually has PSTN
+dial-out enabled, which is the most common first-run failure:
+
+```bash
+python scripts/run_interview.py --check
+```
+
+It prints a per-check report and which run modes (`--text`, `--local-audio`,
+`--join`) are ready.
+
 ## Deployment
 
 The same code runs as a container (see `Dockerfile`):

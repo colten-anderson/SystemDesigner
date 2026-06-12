@@ -43,9 +43,12 @@ def apply_env_file(path: Path) -> None:
 @dataclass
 class InterviewConfig:
     # LLM (Anthropic). claude-opus-4-8 is the current recommended default;
-    # set LLM_MODEL=claude-sonnet-4-6 for lower voice latency if needed.
+    # set LLM_MODEL=claude-sonnet-4-6 for lower latency and ~40% lower cost.
     anthropic_api_key: str | None = None
     llm_model: str = "claude-opus-4-8"
+    # Spoken turns are one or two sentences; capping output tokens bounds the
+    # cost of any runaway turn without affecting normal operation.
+    llm_max_tokens: int = 1024
 
     # Voice providers.
     deepgram_api_key: str | None = None
@@ -77,9 +80,17 @@ class InterviewConfig:
             except ValueError:
                 return default
 
+        def _int(name: str, default: int) -> int:
+            raw = os.environ.get(name)
+            try:
+                return int(raw) if raw else default
+            except ValueError:
+                return default
+
         return cls(
             anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
             llm_model=os.environ.get("LLM_MODEL", cls.llm_model),
+            llm_max_tokens=_int("LLM_MAX_TOKENS", cls.llm_max_tokens),
             deepgram_api_key=os.environ.get("DEEPGRAM_API_KEY"),
             cartesia_api_key=os.environ.get("CARTESIA_API_KEY"),
             cartesia_voice_id=os.environ.get("CARTESIA_VOICE_ID", cls.cartesia_voice_id),

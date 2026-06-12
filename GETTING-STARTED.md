@@ -18,6 +18,9 @@ full mode-aware interview, and writes the validated 10-file portfolio:
 pip install -e ".[voice]"
 cp .env.example .env       # fill in ANTHROPIC, DEEPGRAM, CARTESIA, DAILY keys
 
+# Verify your setup BEFORE the meeting (keys, deps, Daily dial-out):
+python scripts/run_interview.py --check
+
 # Paste the Teams invite's "Dial in by phone" block, or use a dial string:
 python scripts/run_interview.py --join "+15551234567,,123456789#" \
     --out portfolios/<system-name>

@@ -147,7 +147,17 @@ async def run_voice_interview(
     tts = CartesiaTTSService(
         api_key=config.cartesia_api_key, voice_id=config.cartesia_voice_id
     )
-    llm = AnthropicLLMService(api_key=config.anthropic_api_key, model=config.llm_model)
+    llm = AnthropicLLMService(
+        api_key=config.anthropic_api_key,
+        model=config.llm_model,
+        params=AnthropicLLMService.InputParams(
+            # Hour-long interviews re-send the same growing prefix every turn;
+            # caching cuts that input cost by ~90% after the first turn.
+            enable_prompt_caching=True,
+            # Spoken turns are short; this bounds runaway-turn cost.
+            max_tokens=config.llm_max_tokens,
+        ),
+    )
 
     opening = orchestrator.opening_message()
     context_messages: list[dict] = [

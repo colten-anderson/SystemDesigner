@@ -63,6 +63,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     target.add_argument(
         "--local-audio", action="store_true", help="Local microphone/speaker mode."
     )
+    target.add_argument(
+        "--check",
+        action="store_true",
+        help="Preflight check: verify keys, dependencies, and Daily dial-out "
+        "capability before a meeting. No interview is started.",
+    )
     parser.add_argument(
         "--resume",
         metavar="STATE_FILE",
@@ -79,6 +85,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--conference-id", help="Teams phone conference ID (overrides parsing).")
     parser.add_argument(
         "--env-file", type=Path, help="Path to a .env file (default: ./.env if present)."
+    )
+    parser.add_argument(
+        "--model",
+        help="Anthropic model id (overrides LLM_MODEL; e.g. claude-sonnet-4-6 "
+        "for lower latency and cost).",
     )
     parser.add_argument(
         "--quality-gate",
@@ -153,10 +164,15 @@ async def run_text_mode(args: argparse.Namespace, config: InterviewConfig) -> in
     else:
         missing = config.missing_for_text()
         if missing:
-            print(f"ERROR: text mode needs {', '.join(missing)} (see .env.example).")
+            print(
+                f"ERROR: text mode needs {', '.join(missing)} (see .env.example).\n"
+                "Run `python scripts/run_interview.py --check` to verify your setup."
+            )
             return 2
         try:
-            llm = AnthropicInterviewLLM(model=config.llm_model)
+            llm = AnthropicInterviewLLM(
+                model=config.llm_model, max_tokens=config.llm_max_tokens
+            )
         except RuntimeError as error:
             print(f"ERROR: {error}")
             return 2
@@ -193,7 +209,8 @@ async def run_voice_mode(args: argparse.Namespace, config: InterviewConfig, loca
         print(
             "ERROR: voice mode needs these environment variables: "
             + ", ".join(missing)
-            + ". Copy .env.example to .env and fill them in."
+            + ". Copy .env.example to .env and fill them in.\n"
+            "Run `python scripts/run_interview.py --check` to verify your setup."
         )
         return 2
 
@@ -253,11 +270,21 @@ async def run_voice_mode(args: argparse.Namespace, config: InterviewConfig, loca
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
-    if not any([args.join, args.text, args.local_audio, args.resume]):
-        print("ERROR: choose one of --join, --text, --local-audio, or --resume.")
+    if not any([args.join, args.text, args.local_audio, args.resume, args.check]):
+        print(
+            "ERROR: choose one of --join, --text, --local-audio, --resume, or --check.\n"
+            "Tip: run with --check first to verify your setup."
+        )
         return 2
 
     config = InterviewConfig.from_env(args.env_file)
+    if args.model:
+        config.llm_model = args.model
+
+    if args.check:
+        from voice_interview.doctor import print_report, run_checks
+
+        return print_report(run_checks(config, REPO_ROOT))
 
     if args.text:
         return asyncio.run(run_text_mode(args, config))
