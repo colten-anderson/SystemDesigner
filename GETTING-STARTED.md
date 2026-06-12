@@ -1,9 +1,40 @@
 # Getting Started
 
+There are two ways to fill a portfolio:
+
+- **Voice interview (recommended for teams):** drop the agent into a live
+  Teams call and let it run the whole interview — see step 2a.
+- **Manual / chat interview:** use the interviewer prompt in a text chat and
+  fill the files yourself — see step 2b.
+
 ## 1) Choose one IT system
 Create a folder for a single system portfolio (example: `portfolios/exchange-online/`).
 
-## 2) Start with the interviewer prompt
+## 2a) Run the live voice interview
+One command joins a Microsoft Teams meeting via its dial-in number, leads the
+full mode-aware interview, and writes the validated 10-file portfolio:
+
+```bash
+pip install -e ".[voice]"
+cp .env.example .env       # fill in ANTHROPIC, DEEPGRAM, CARTESIA, DAILY keys
+
+# Paste the Teams invite's "Dial in by phone" block, or use a dial string:
+python scripts/run_interview.py --join "+15551234567,,123456789#" \
+    --out portfolios/<system-name>
+```
+
+Accounts you need (details in [docs/voice-interview.md](docs/voice-interview.md)):
+Anthropic (LLM), Deepgram (STT), Cartesia (TTS), and Daily with PSTN dial-out
+enabled (paid feature). The Teams meeting needs a dial-in number, which exists
+when the organizer's tenant has Audio Conferencing.
+
+Platform support: **Teams ✅ (dial-in)** · **Slack Huddles ❌** (no audio API
+exists — documented, not faked) · **local mic / text console ✅** for
+development (`--local-audio` / `--text`). Progress is saved continuously;
+resume a dropped call with
+`python scripts/run_interview.py --resume portfolios/<system-name>/.interview-state.json`.
+
+## 2b) Or run the interview manually in a chat
 Use `interview-protocol/agent-system-prompt.md` as your agent system prompt.
 
 The interviewer must begin with the mode picker:
