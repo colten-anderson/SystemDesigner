@@ -124,6 +124,11 @@ per-file coverage table, every TBD as a follow-up row (field, owner, next
 step), the open questions raised during the call, and — for paused runs — the
 exact resume command. Send it to the team as the post-meeting action list.
 
+When you don't pass `--out`, the run starts in a timestamped folder and is
+renamed to the captured system name at the end (e.g.
+`portfolios/customer-billing-api`); the state file moves with it, so the
+printed resume command always points at the right place.
+
 ## Quality gate and TBD warnings
 
 The interview output is scored by the existing validator

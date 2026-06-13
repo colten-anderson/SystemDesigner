@@ -116,6 +116,9 @@ python scripts/create_portfolio.py ./my-system --templates-dir ./templates
 
 ### 2) Run a live voice interview (Teams call → finished portfolio)
 ```bash
+# Verify keys, dependencies, and Daily dial-out before the meeting:
+python scripts/run_interview.py --check
+
 # One command: dial into a Teams meeting and run the whole interview.
 # Paste the invite's "Dial in by phone" block, or use a dial string:
 python scripts/run_interview.py --join "+15551234567,,123456789#" --out portfolios/my-system

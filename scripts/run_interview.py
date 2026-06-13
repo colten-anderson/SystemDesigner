@@ -123,6 +123,20 @@ def build_orchestrator(args: argparse.Namespace, config: InterviewConfig):
     return plan, InterviewOrchestrator(plan, state, store)
 
 
+def finalize_run_output(orchestrator, *, auto_named: bool) -> Path:
+    """Rename auto-named output dirs to the captured system name and refresh
+    the summary so its resume command points at the final location."""
+
+    from voice_interview.naming import finalize_output_dir
+    from voice_interview.report import write_interview_summary
+
+    out_dir = finalize_output_dir(
+        orchestrator.state, orchestrator.store, auto_named=auto_named
+    )
+    write_interview_summary(orchestrator.state, orchestrator.plan, out_dir)
+    return out_dir
+
+
 def print_resume_hint_if_paused(orchestrator) -> int:
     out_dir = Path(orchestrator.state.output_dir)
     print(f"Follow-up list (owners and open TBDs): {out_dir / 'interview-summary.md'}")
@@ -199,7 +213,7 @@ async def run_text_mode(args: argparse.Namespace, config: InterviewConfig) -> in
     written = await run_text_interview(
         orchestrator, llm, input_fn=input_fn, output_fn=output_fn
     )
-    out_dir = Path(orchestrator.state.output_dir)
+    out_dir = finalize_run_output(orchestrator, auto_named=not args.out and not args.resume)
     print(f"\n\nWrote {len(written)} portfolio files to {out_dir}")
     print_resume_hint_if_paused(orchestrator)
     return validate_output(out_dir, args.quality_gate)
@@ -263,7 +277,7 @@ async def run_voice_mode(args: argparse.Namespace, config: InterviewConfig, loca
     written = await run_voice_interview(
         orchestrator, config, join_target=join_target, local_audio=local
     )
-    out_dir = Path(orchestrator.state.output_dir)
+    out_dir = finalize_run_output(orchestrator, auto_named=not args.out and not args.resume)
     print(f"\nWrote {len(written)} portfolio files to {out_dir}")
     print_resume_hint_if_paused(orchestrator)
     return validate_output(out_dir, args.quality_gate)
