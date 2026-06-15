@@ -1,0 +1,15 @@
+# Secrets — never commit provider keys.
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Generated interview output (keep portfolios out of the framework repo by
+# default; commit them in your own portfolio repos).
+portfolios/
+reports/

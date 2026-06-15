@@ -25,6 +25,7 @@ This repository includes end-to-end capabilities for **creating**, **filling**, 
 
 3. **Guided elicitation workflow**
    - A dedicated interviewer prompt (`interview-protocol/agent-system-prompt.md`) to run structured discovery sessions.
+   - A **live voice interviewer** (`scripts/run_interview.py`) that joins a Microsoft Teams call, leads the full mode-aware interview, and writes the validated portfolio — see [docs/voice-interview.md](docs/voice-interview.md).
 
 4. **Portfolio scaffolding CLI** (`scripts/create_portfolio.py`)
    - Creates a new portfolio directory from templates.
@@ -78,12 +79,14 @@ Mode changes emphasis, not file names.
 10. `decisions-and-history.md`
 
 ## Repository layout
-- `interview-protocol/` — central interviewer system prompt.
-- `templates/` — baseline markdown templates for each portfolio file.
+- `interview-protocol/` — central interviewer system prompt (also drives the voice agent).
+- `templates/` — baseline markdown templates for each portfolio file (also the voice agent's question source).
 - `examples/` — sample portfolios (Exchange Online, OneDrive, NinjaOne RMM, Customer Billing API, Snowflake Analytics Platform).
 - `wiring/` — implementation patterns for consuming context in tools and workflows.
-- `scripts/` — helper utilities such as portfolio scaffolding and structure validation.
-- `tests/` — script-level tests for scaffold and validation behavior.
+- `scripts/` — helper utilities: portfolio scaffolding, structure validation, and the voice interview runner.
+- `voice_interview/` — the voice-agent package (orchestrator, Pipecat pipeline, meeting connectors).
+- `docs/` — deep-dive guides, including the [voice interview guide](docs/voice-interview.md).
+- `tests/` — tests for the scaffold/validation scripts and the interview orchestrator.
 
 ## Quick start (5 minutes)
 1. Pick a system and create a folder for it.
@@ -111,7 +114,30 @@ python scripts/create_portfolio.py ./my-system --force
 python scripts/create_portfolio.py ./my-system --templates-dir ./templates
 ```
 
-### 2) Validate portfolio quality and completeness
+### 2) Run a live voice interview (Teams call → finished portfolio)
+```bash
+# Verify keys, dependencies, and Daily dial-out before the meeting:
+python scripts/run_interview.py --check
+
+# One command: dial into a Teams meeting and run the whole interview.
+# Paste the invite's "Dial in by phone" block, or use a dial string:
+python scripts/run_interview.py --join "+15551234567,,123456789#" --out portfolios/my-system
+
+# Development modes (no telephony):
+python scripts/run_interview.py --text           # type instead of talk
+python scripts/run_interview.py --local-audio    # local mic/speaker
+
+# Resume a dropped call exactly where it left off:
+python scripts/run_interview.py --resume portfolios/my-system/.interview-state.json
+```
+The agent introduces itself, runs the mode picker and all 10 files, records
+explicit TBDs with owners for unknowns, saves state continuously, and
+validates the finished portfolio at quality gate 80. Dropped calls and pauses
+keep the session resumable (the partial portfolio is written either way); only
+an explicit end finalizes it. Required keys and the Teams-vs-Slack support
+matrix: [docs/voice-interview.md](docs/voice-interview.md).
+
+### 3) Validate portfolio quality and completeness
 ```bash
 # Basic validation for one portfolio
 python scripts/validate_portfolio.py my-system
