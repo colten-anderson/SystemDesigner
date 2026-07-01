@@ -74,6 +74,23 @@ def test_missing_key_reports() -> None:
     assert InterviewConfig().missing_for_text() == ["ANTHROPIC_API_KEY"]
 
 
+def test_missing_keys_for_twilio_provider() -> None:
+    config = InterviewConfig(
+        telephony_provider="twilio",
+        anthropic_api_key="a",
+        deepgram_api_key="d",
+        cartesia_api_key="c",
+        twilio_account_sid="AC1",
+    )
+    missing = config.missing_for_voice()
+    assert "DAILY_API_KEY" not in missing
+    assert "TWILIO_AUTH_TOKEN" in missing
+    assert "TWILIO_FROM_NUMBER" in missing
+    assert "PUBLIC_URL" in missing
+    # Local audio needs no telephony keys regardless of provider.
+    assert config.missing_for_local_audio() == []
+
+
 def test_snapshot_contains_no_secrets() -> None:
     config = InterviewConfig(anthropic_api_key="sk-secret", daily_api_key="dk-secret")
     snapshot = config.snapshot()

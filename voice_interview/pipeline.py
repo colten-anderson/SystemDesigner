@@ -131,18 +131,15 @@ def _build_transcript_loggers(orchestrator: InterviewOrchestrator):
     return UserTranscriptLogger(), AssistantTranscriptLogger()
 
 
-async def run_voice_interview(
-    orchestrator: InterviewOrchestrator,
-    config: InterviewConfig,
-    *,
-    join_target: JoinTarget | None,
-    local_audio: bool = False,
-) -> list[Path]:
-    """Join the meeting, run the interview, and write the portfolio files."""
+def _build_interview_task(transport, orchestrator: InterviewOrchestrator, config: InterviewConfig):
+    """Assemble the STT -> LLM(tools) -> TTS pipeline on any transport.
 
-    from pipecat.frames.frames import EndFrame, TTSSpeakFrame
+    Shared by every meeting connector (Daily, Twilio, local audio) — adding a
+    platform never duplicates this. Returns ``(task, speak_opening)``.
+    """
+
+    from pipecat.frames.frames import TTSSpeakFrame
     from pipecat.pipeline.pipeline import Pipeline
-    from pipecat.pipeline.runner import PipelineRunner
     from pipecat.pipeline.task import PipelineParams, PipelineTask
     from pipecat.processors.aggregators.llm_context import LLMContext
     from pipecat.processors.aggregators.llm_response_universal import (
@@ -151,19 +148,6 @@ async def run_voice_interview(
     from pipecat.services.anthropic.llm import AnthropicLLMService
     from pipecat.services.cartesia.tts import CartesiaTTSService
     from pipecat.services.deepgram.stt import DeepgramSTTService
-
-    connector: MeetingConnector
-    if local_audio:
-        from .connectors.local_audio import LocalAudioConnector
-
-        connector = LocalAudioConnector(config)
-    else:
-        from .connectors.teams_dialin import TeamsDialInConnector
-
-        assert join_target is not None
-        connector = TeamsDialInConnector(config, join_target)
-
-    transport = await connector.create_transport()
 
     stt = DeepgramSTTService(api_key=config.deepgram_api_key)
     tts = CartesiaTTSService(
@@ -229,6 +213,71 @@ async def run_voice_interview(
         orchestrator.on_assistant_text(opening)
         await task.queue_frame(TTSSpeakFrame(opening))
 
+    return task, speak_opening
+
+
+async def _run_twilio_flow(
+    orchestrator: InterviewOrchestrator, config: InterviewConfig, join_target: JoinTarget
+) -> None:
+    from pipecat.frames.frames import EndFrame
+    from pipecat.pipeline.runner import PipelineRunner
+
+    from .connectors.twilio_dialout import TwilioDialOutConnector
+
+    connector = TwilioDialOutConnector(config, join_target)
+
+    async def run_with_transport(transport) -> None:
+        task, speak_opening = _build_interview_task(transport, orchestrator, config)
+
+        # The media stream attaches once the call is answered and SendDigits
+        # has typed the conference ID; greet shortly after.
+        asyncio.get_running_loop().call_later(
+            2.0, lambda: asyncio.create_task(speak_opening())
+        )
+
+        @transport.event_handler("on_client_disconnected")
+        async def on_client_disconnected(transport, client):
+            # Caller hung up: keep the session resumable.
+            if not orchestrator.is_complete():
+                orchestrator.pause_interview()
+            await task.queue_frame(EndFrame())
+
+        await PipelineRunner().run(task)
+
+    await connector.serve(run_with_transport)
+
+
+async def run_voice_interview(
+    orchestrator: InterviewOrchestrator,
+    config: InterviewConfig,
+    *,
+    join_target: JoinTarget | None,
+    local_audio: bool = False,
+) -> list[Path]:
+    """Join the meeting, run the interview, and write the portfolio files."""
+
+    if not local_audio and config.telephony_provider == "twilio":
+        assert join_target is not None
+        await _run_twilio_flow(orchestrator, config, join_target)
+        return _write_outputs(orchestrator)
+
+    from pipecat.frames.frames import EndFrame
+    from pipecat.pipeline.runner import PipelineRunner
+
+    connector: MeetingConnector
+    if local_audio:
+        from .connectors.local_audio import LocalAudioConnector
+
+        connector = LocalAudioConnector(config)
+    else:
+        from .connectors.teams_dialin import TeamsDialInConnector
+
+        assert join_target is not None
+        connector = TeamsDialInConnector(config, join_target)
+
+    transport = await connector.create_transport()
+    task, speak_opening = _build_interview_task(transport, orchestrator, config)
+
     if local_audio:
         # No remote participants: greet as soon as the pipeline starts.
         asyncio.get_running_loop().call_later(
@@ -260,6 +309,10 @@ async def run_voice_interview(
     finally:
         await connector.disconnect()
 
+    return _write_outputs(orchestrator)
+
+
+def _write_outputs(orchestrator: InterviewOrchestrator) -> list[Path]:
     # Always produce the portfolio. The writer renders unrecorded fields as
     # TBDs without mutating state, so a dropped or paused call yields a
     # complete partial portfolio AND remains resumable; only an explicit

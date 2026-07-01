@@ -37,7 +37,7 @@ validator counts as a filled field while keeping the unknown honest.
 
 | Platform | Status | How |
 |---|---|---|
-| **Microsoft Teams** | ✅ Supported | PSTN dial-out to the meeting's dial-in number + DTMF conference ID (via Daily). Requires the organizer's tenant to have **Audio Conferencing** (so the invite has a dial-in number). |
+| **Microsoft Teams** | ✅ Supported | PSTN dial-out to the meeting's dial-in number + automatic conference-ID entry, via **Daily or Twilio** (pick one — see "Choosing a telephony provider"). Requires the organizer's tenant to have **Audio Conferencing** (so the invite has a dial-in number). |
 | **Any phone-reachable bridge** | ✅ Works incidentally | Anything with a dial-in number + DTMF conference ID (e.g. Zoom dial-in) can be joined the same way: `--dial-number` + `--conference-id`. |
 | **Slack Huddles** | ❌ Not supported | Slack exposes **no audio API and no dial-in** for Huddles — a bot cannot join one with audio in any supported way. We document this rather than fake it. Adding Slack later (if Slack ships an API) is one new `MeetingConnector` subclass. |
 | **Local microphone** | ✅ Dev mode | `--local-audio` (no telephony, no meeting). |
@@ -50,15 +50,43 @@ validator counts as a filled field while keeping the unknown honest.
 | [Anthropic](https://console.anthropic.com/) | LLM (the interviewer's brain) | always | `ANTHROPIC_API_KEY`. Default model `claude-opus-4-8`; set `LLM_MODEL=claude-sonnet-4-6` for lower latency. |
 | [Deepgram](https://console.deepgram.com/) | Speech-to-text | voice modes | `DEEPGRAM_API_KEY` |
 | [Cartesia](https://play.cartesia.ai/) | Text-to-speech | voice modes | `CARTESIA_API_KEY`, optional `CARTESIA_VOICE_ID` |
-| [Daily](https://dashboard.daily.co/) | WebRTC transport + PSTN dial-out | `--join` | `DAILY_API_KEY`. **PSTN dial-out is a paid, account-gated Daily feature**: your Daily domain needs dial-out enabled and a purchased phone number. Without it the first dial attempt fails with a clear error. |
+| Telephony (pick ONE) | The phone call into Teams | `--join` | **Daily** or **Twilio** — see the comparison below. |
 
 Copy `.env.example` to `.env` and fill in the keys. All knobs are env/config
 driven — nothing provider-specific is hardcoded.
 
 ```bash
-pip install -e ".[voice]"     # full voice stack (Pipecat + providers)
-pip install -e ".[text]"      # text mode only (anthropic SDK)
+pip install -e ".[voice]"          # voice stack with Daily telephony
+pip install -e ".[voice-twilio]"   # voice stack with Twilio telephony
+pip install -e ".[text]"           # text mode only (anthropic SDK)
 ```
+
+### Choosing a telephony provider
+
+The agent reaches Teams by placing an ordinary phone call to the meeting's
+dial-in number. Two interchangeable providers can place that call
+(`TELEPHONY_PROVIDER=daily|twilio` or `--provider`):
+
+| | **Daily** (default) | **Twilio** |
+|---|---|---|
+| Procurement | **Account-gated**: PSTN dial-out must be enabled by Daily on your domain, plus a purchased number | **Fully self-serve**: sign up, buy a number with a card, dial immediately |
+| Network setup | None — Daily hosts the media | Needs a **publicly reachable URL** for the call audio (Twilio streams it to you): run `ngrok http 8765` and set `PUBLIC_URL` to the https URL |
+| Config | `DAILY_API_KEY` | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `PUBLIC_URL` |
+| Conference-ID entry | DTMF tones sent on the live call | Typed automatically via the call's `SendDigits` (the IVR delays map to `DTMF_*_DELAY_S` the same way) |
+| Cost shape | Per-minute room + PSTN usage | Per-minute PSTN + ~$1/month for the number |
+
+**If getting a Daily account is a blocker, use Twilio:**
+
+```bash
+pip install -e ".[voice-twilio]"
+ngrok http 8765          # note the https URL it prints
+python scripts/run_interview.py --provider twilio \
+    --public-url https://<your-tunnel>.ngrok.app \
+    --join "+15551234567,,123456789#" --out portfolios/my-system
+```
+
+Everything else (interview behavior, resume, summaries, validation) is
+identical — the provider only changes who places the phone call.
 
 ## Running a real Teams interview
 

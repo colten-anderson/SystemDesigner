@@ -103,7 +103,43 @@ def run_checks(
     key_check("anthropic", "ANTHROPIC_API_KEY", config.anthropic_api_key, "all modes")
     key_check("deepgram", "DEEPGRAM_API_KEY", config.deepgram_api_key, "voice modes")
     key_check("cartesia", "CARTESIA_API_KEY", config.cartesia_api_key, "voice modes")
-    key_check("daily", "DAILY_API_KEY", config.daily_api_key, "--join (Teams dial-out)")
+
+    # Telephony (--join): provider-selected via TELEPHONY_PROVIDER.
+    if config.telephony_provider == "twilio":
+        twilio_missing = [
+            env
+            for env, value in [
+                ("TWILIO_ACCOUNT_SID", config.twilio_account_sid),
+                ("TWILIO_AUTH_TOKEN", config.twilio_auth_token),
+                ("TWILIO_FROM_NUMBER", config.twilio_from_number),
+                ("PUBLIC_URL", config.public_url),
+            ]
+            if not value
+        ]
+        if twilio_missing:
+            results.append(
+                CheckResult(
+                    "telephony",
+                    WARN,
+                    "provider=twilio; missing " + ", ".join(twilio_missing)
+                    + " — required for --join (PUBLIC_URL is your tunnel, "
+                    "e.g. `ngrok http 8765`)",
+                )
+            )
+        else:
+            results.append(
+                CheckResult(
+                    "telephony",
+                    OK,
+                    f"provider=twilio, from {config.twilio_from_number}, "
+                    f"streaming to {config.public_url}",
+                )
+            )
+    else:
+        key_check(
+            "telephony", "DAILY_API_KEY", config.daily_api_key,
+            "--join (provider=daily Teams dial-out)",
+        )
 
     # 4. Optional dependencies, per mode.
     if _module_available("anthropic"):
@@ -142,7 +178,7 @@ def run_checks(
 
     # 5. Daily API reachability + dial-out capability (the #1 first-run trap:
     #    PSTN dial-out is a paid, account-gated Daily feature).
-    if config.daily_api_key and check_network:
+    if config.telephony_provider != "twilio" and config.daily_api_key and check_network:
         status, body = http_get(
             f"{config.daily_api_url}/",
             {"Authorization": f"Bearer {config.daily_api_key}"},
@@ -194,7 +230,8 @@ def mode_readiness(results: list[CheckResult]) -> dict[str, bool]:
             "python", "protocol", "anthropic", "deepgram", "cartesia", "voice deps"
         ),
         "--join (Teams)": good(
-            "python", "protocol", "anthropic", "deepgram", "cartesia", "daily", "voice deps"
+            "python", "protocol", "anthropic", "deepgram", "cartesia",
+            "telephony", "voice deps",
         ),
     }
 
