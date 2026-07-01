@@ -24,11 +24,40 @@ def test_checks_with_no_keys_warn_but_do_not_fail() -> None:
     assert named["python"].status == OK
     assert named["protocol"].status == OK
     assert "10 templates" in named["protocol"].detail
-    for key in ["anthropic", "deepgram", "cartesia", "daily"]:
+    for key in ["anthropic", "deepgram", "cartesia", "telephony"]:
         assert named[key].status == WARN
         assert ".env" in named[key].detail
     # No hard failures means exit code 0: warnings guide, they don't block.
     assert print_report(results) == 0
+
+
+def test_twilio_provider_checks_its_own_keys() -> None:
+    incomplete = run_checks(
+        InterviewConfig(telephony_provider="twilio", twilio_account_sid="AC1"),
+        REPO_ROOT,
+        check_network=False,
+    )
+    telephony = by_name(incomplete)["telephony"]
+    assert telephony.status == WARN
+    assert "TWILIO_AUTH_TOKEN" in telephony.detail
+    assert "PUBLIC_URL" in telephony.detail
+
+    complete = run_checks(
+        InterviewConfig(
+            telephony_provider="twilio",
+            twilio_account_sid="AC1",
+            twilio_auth_token="t",
+            twilio_from_number="+1999",
+            public_url="https://x.ngrok.app",
+        ),
+        REPO_ROOT,
+        check_network=False,
+    )
+    telephony = by_name(complete)["telephony"]
+    assert telephony.status == OK
+    assert "provider=twilio" in telephony.detail
+    # The Daily network probe must not run for the twilio provider.
+    assert "daily api" not in by_name(complete)
 
 
 def test_daily_api_dialout_enabled(capsys) -> None:
@@ -90,7 +119,7 @@ def test_mode_readiness_logic() -> None:
     def result_set(ready_names):
         all_names = [
             "python", "protocol", "anthropic", "deepgram",
-            "cartesia", "daily", "text deps", "voice deps",
+            "cartesia", "telephony", "text deps", "voice deps",
         ]
         return [
             CheckResult(name, OK if name in ready_names else WARN, "")
@@ -105,7 +134,7 @@ def test_mode_readiness_logic() -> None:
     everything = mode_readiness(
         result_set(
             ["python", "protocol", "anthropic", "deepgram", "cartesia",
-             "daily", "text deps", "voice deps"]
+             "telephony", "text deps", "voice deps"]
         )
     )
     assert all(everything.values())

@@ -27,9 +27,11 @@ python scripts/run_interview.py --join "+15551234567,,123456789#" \
 ```
 
 Accounts you need (details in [docs/voice-interview.md](docs/voice-interview.md)):
-Anthropic (LLM), Deepgram (STT), Cartesia (TTS), and Daily with PSTN dial-out
-enabled (paid feature). The Teams meeting needs a dial-in number, which exists
-when the organizer's tenant has Audio Conferencing.
+Anthropic (LLM), Deepgram (STT), Cartesia (TTS), and ONE telephony provider —
+Daily (needs PSTN dial-out enabled on your domain) or **Twilio (fully
+self-serve: buy a number and dial immediately;** use `--provider twilio` with
+a public tunnel URL, see the docs). The Teams meeting needs a dial-in number,
+which exists when the organizer's tenant has Audio Conferencing.
 
 Platform support: **Teams ✅ (dial-in)** · **Slack Huddles ❌** (no audio API
 exists — documented, not faked) · **local mic / text console ✅** for

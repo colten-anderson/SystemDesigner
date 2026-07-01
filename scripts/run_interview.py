@@ -92,6 +92,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "for lower latency and cost).",
     )
     parser.add_argument(
+        "--provider",
+        choices=["daily", "twilio"],
+        help="Telephony provider for --join (overrides TELEPHONY_PROVIDER). "
+        "daily = managed transport with account-gated PSTN dial-out; "
+        "twilio = fully self-serve, but needs --public-url (e.g. ngrok).",
+    )
+    parser.add_argument(
+        "--public-url",
+        help="Publicly reachable URL of this process for provider=twilio "
+        "(overrides PUBLIC_URL), e.g. the https URL from `ngrok http 8765`.",
+    )
+    parser.add_argument(
         "--quality-gate",
         type=int,
         default=80,
@@ -296,6 +308,10 @@ def main(argv: list[str] | None = None) -> int:
     config = InterviewConfig.from_env(args.env_file)
     if args.model:
         config.llm_model = args.model
+    if args.provider:
+        config.telephony_provider = args.provider
+    if args.public_url:
+        config.public_url = args.public_url
 
     if args.check:
         from voice_interview.doctor import print_report, run_checks
